@@ -44,7 +44,7 @@ class BluetoothDisconnectReceiver : BroadcastReceiver() {
         receiverScope.launch {
             try {
                 val recorder = ParkingRecorder(
-                    AutomationRepository(context.applicationContext),
+                    AutomaticRepository(context.applicationContext),
                     HistoryRepository(AppDatabase.getDatabase(context)),
                     LocationProvider(context.applicationContext),
                 )

@@ -1,15 +1,11 @@
 package org.cssnr.parking.ui
 
-import android.Manifest
-import android.content.pm.PackageManager
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
+import androidx.annotation.DrawableRes
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Bluetooth
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Icon
@@ -19,14 +15,10 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.ScaffoldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalInspectionMode
-import androidx.core.content.ContextCompat
-import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.compose.ui.res.painterResource
 import androidx.navigation.NavDestination.Companion.hasRoute
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
@@ -35,24 +27,27 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
-import org.cssnr.parking.ui.navigation.Automation
+import org.cssnr.parking.R
+import org.cssnr.parking.ui.navigation.Automatic
 import org.cssnr.parking.ui.navigation.History
+import org.cssnr.parking.ui.navigation.Location
 import org.cssnr.parking.ui.navigation.MapDetail
 import org.cssnr.parking.ui.navigation.Settings
-import org.cssnr.parking.ui.screens.AutomationRoute
+import org.cssnr.parking.ui.screens.AutomaticRoute
 import org.cssnr.parking.ui.screens.HistoryRoute
+import org.cssnr.parking.ui.screens.LocationRoute
 import org.cssnr.parking.ui.screens.MapRoute
 import org.cssnr.parking.ui.screens.SettingsRoute
-import org.cssnr.parking.ui.viewmodel.AutomationViewModel
-import kotlinx.coroutines.flow.first
 
 enum class Destination(
     val route: Any,
     val label: String,
-    val icon: ImageVector,
+    val icon: ImageVector?,
+    @DrawableRes val iconRes: Int? = null,
 ) {
+    LOCATION(Location, "Location", null, R.drawable.md_pin_road_24px),
     HISTORY(History, "History", Icons.Filled.History),
-    AUTOMATION(Automation, "Automation", Icons.Filled.Bluetooth),
+    AUTOMATIC(Automatic, "Automatic", null, R.drawable.md_parking_sign_24px),
     SETTINGS(Settings, "Settings", Icons.Filled.Settings),
 }
 
@@ -61,28 +56,6 @@ fun ParKingApp() {
     val navController = rememberNavController()
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = backStackEntry?.destination
-
-    val context = LocalContext.current
-    val inspectionMode = LocalInspectionMode.current
-    val automationViewModel: AutomationViewModel = viewModel()
-
-    val fineLocationLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { /* first launch request, result intentionally ignored */ }
-
-    LaunchedEffect(inspectionMode) {
-        if (!inspectionMode) {
-            val alreadyRequested = automationViewModel.locationPermissionRequested.first()
-            val locationGranted = ContextCompat.checkSelfPermission(
-                context,
-                Manifest.permission.ACCESS_FINE_LOCATION,
-            ) == PackageManager.PERMISSION_GRANTED
-            if (!alreadyRequested && !locationGranted) {
-                automationViewModel.markLocationPermissionRequested()
-                fineLocationLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
-            }
-        }
-    }
 
     Scaffold(
         contentWindowInsets = ScaffoldDefaults.contentWindowInsets
@@ -103,10 +76,18 @@ fun ParKingApp() {
                             }
                         },
                         icon = {
-                            Icon(
-                                imageVector = destination.icon,
-                                contentDescription = destination.label,
-                            )
+                            val imageVector = destination.icon
+                            if (imageVector != null) {
+                                Icon(
+                                    imageVector = imageVector,
+                                    contentDescription = destination.label,
+                                )
+                            } else {
+                                Icon(
+                                    painter = painterResource(destination.iconRes!!),
+                                    contentDescription = destination.label,
+                                )
+                            }
                         },
                         label = { Text(destination.label) },
                     )
@@ -116,11 +97,14 @@ fun ParKingApp() {
     ) { innerPadding ->
         NavHost(
             navController = navController,
-            startDestination = History,
+            startDestination = Location,
             modifier = Modifier
                 .padding(innerPadding)
                 .consumeWindowInsets(innerPadding),
         ) {
+            composable<Location> {
+                LocationRoute()
+            }
             composable<History> {
                 HistoryRoute(
                     onRecordClick = { record ->
@@ -130,19 +114,22 @@ fun ParKingApp() {
                                 title = record.bluetoothName ?: record.bluetoothAddress,
                                 latitude = record.latitude,
                                 longitude = record.longitude,
+                                timestamp = record.timestamp,
                             ),
                         )
                     },
                 )
             }
             composable<MapDetail> { entry ->
+                val detail = entry.toRoute<MapDetail>()
                 MapRoute(
-                    detail = entry.toRoute<MapDetail>(),
+                    detail = detail,
+                    title = detail.title,
                     onBack = { navController.popBackStack() },
                 )
             }
-            composable<Automation> {
-                AutomationRoute()
+            composable<Automatic> {
+                AutomaticRoute()
             }
             composable<Settings> {
                 SettingsRoute()

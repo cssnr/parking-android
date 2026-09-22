@@ -7,16 +7,11 @@ import androidx.datastore.preferences.core.stringSetPreferencesKey
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
-class AutomationRepository(private val context: Context) {
+class AutomaticRepository(private val context: Context) {
 
-    val automationEnabled: Flow<Boolean> = context.parkingDataStore.data.map { preferences ->
-        preferences[AUTOMATION_ENABLED] ?: false
+    val automaticEnabled: Flow<Boolean> = context.parkingDataStore.data.map { preferences ->
+        preferences[AUTOMATIC_ENABLED] ?: false
     }
-
-    val locationPermissionRequested: Flow<Boolean> =
-        context.parkingDataStore.data.map { preferences ->
-            preferences[LOCATION_PERMISSION_REQUESTED] ?: false
-        }
 
     val backgroundPermissionRequested: Flow<Boolean> =
         context.parkingDataStore.data.map { preferences ->
@@ -27,15 +22,9 @@ class AutomationRepository(private val context: Context) {
         preferences[SELECTED_BLUETOOTH_DEVICES] ?: emptySet()
     }
 
-    suspend fun setAutomationEnabled(enabled: Boolean) {
+    suspend fun setAutomaticEnabled(enabled: Boolean) {
         context.parkingDataStore.edit { preferences ->
-            preferences[AUTOMATION_ENABLED] = enabled
-        }
-    }
-
-    suspend fun markLocationPermissionRequested() {
-        context.parkingDataStore.edit { preferences ->
-            preferences[LOCATION_PERMISSION_REQUESTED] = true
+            preferences[AUTOMATIC_ENABLED] = enabled
         }
     }
 
@@ -52,11 +41,9 @@ class AutomationRepository(private val context: Context) {
     }
 
     private companion object {
-        val AUTOMATION_ENABLED = booleanPreferencesKey("automation.enabled")
-        val LOCATION_PERMISSION_REQUESTED =
-            booleanPreferencesKey("automation.locationPermissionRequested")
+        val AUTOMATIC_ENABLED = booleanPreferencesKey("automatic.enabled")
         val BACKGROUND_PERMISSION_REQUESTED =
-            booleanPreferencesKey("automation.backgroundPermissionRequested")
-        val SELECTED_BLUETOOTH_DEVICES = stringSetPreferencesKey("automation.bluetoothDevices")
+            booleanPreferencesKey("automatic.backgroundPermissionRequested")
+        val SELECTED_BLUETOOTH_DEVICES = stringSetPreferencesKey("automatic.bluetoothDevices")
     }
 }

@@ -1,6 +1,7 @@
 package org.cssnr.parking.ui.screens
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
@@ -30,11 +31,16 @@ import org.maplibre.compose.sources.rememberGeoJsonSource
 import org.maplibre.compose.style.BaseStyle
 import org.maplibre.spatialk.geojson.Position
 import org.cssnr.parking.ui.navigation.MapDetail
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.time.format.FormatStyle
 
 @Composable
 fun MapRoute(
-    detail: MapDetail,
-    onBack: () -> Unit,
+    detail: MapDetail?,
+    title: String,
+    onBack: (() -> Unit)?,
 ) {
     val locationProvider = rememberDefaultLocationProvider()
     val locationState = rememberLocationState(provider = locationProvider)
@@ -48,6 +54,7 @@ fun MapRoute(
 
     MapScreen(
         detail = detail,
+        title = title,
         userPosition = locationState.lastLocation?.position,
         onBack = onBack,
     )
@@ -56,9 +63,10 @@ fun MapRoute(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MapScreen(
-    detail: MapDetail,
+    detail: MapDetail?,
+    title: String,
     userPosition: Position?,
-    onBack: () -> Unit,
+    onBack: (() -> Unit)?,
     modifier: Modifier = Modifier,
 ) {
     Scaffold(
@@ -66,42 +74,69 @@ fun MapScreen(
         topBar = {
             TopAppBar(
                 title = {
-                    Text(
-                        text = detail.title,
-                        style = MaterialTheme.typography.titleLarge,
-                        maxLines = 1,
-                    )
+                    val timestamp = detail?.let { formatTimestamp(it.timestamp) }
+                    if (timestamp != null) {
+                        Column {
+                            Text(
+                                text = timestamp,
+                                style = MaterialTheme.typography.titleLarge,
+                                maxLines = 1,
+                            )
+                            if (title.isNotBlank()) {
+                                Text(
+                                    text = title,
+                                    style = MaterialTheme.typography.titleSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 1,
+                                )
+                            }
+                        }
+                    } else {
+                        Text(
+                            text = title,
+                            style = MaterialTheme.typography.titleLarge,
+                            maxLines = 1,
+                        )
+                    }
                 },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Back",
-                        )
+                    if (onBack != null) {
+                        IconButton(onClick = onBack) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = "Back",
+                            )
+                        }
                     }
                 },
             )
         },
     ) { innerPadding ->
-        val parkingPosition = Position(
-            longitude = detail.longitude,
-            latitude = detail.latitude,
-        )
+        val parkingPosition = detail?.let { position ->
+            Position(
+                longitude = position.longitude,
+                latitude = position.latitude,
+            )
+        }
         val mapState = rememberMapState(
             baseStyle = BaseStyle.Uri("https://tiles.openfreemap.org/styles/liberty"),
-            initialCameraPosition = CameraPosition(target = parkingPosition, zoom = 17.0),
+            initialCameraPosition = parkingPosition?.let {
+                CameraPosition(target = it, zoom = 17.0)
+            } ?: CameraPosition(),
         ) {
-            val parkingSource = rememberGeoJsonSource(
-                GeoJsonData.JsonString(pointFeatureJson(parkingPosition)),
-            )
-            CircleLayer(
-                id = "parking",
-                source = parkingSource,
-                color = const(Color(0xFFD32F2F)),
-                radius = const(7.dp),
-                strokeColor = const(Color.White),
-                strokeWidth = const(2.dp),
-            )
+            if (parkingPosition != null) {
+                val parkingSource = rememberGeoJsonSource(
+                    GeoJsonData.JsonString(pointFeatureJson(parkingPosition)),
+                )
+                CircleLayer(
+                    id = "parking",
+                    source = parkingSource,
+                    color = const(Color(0xFFD32F2F)),
+                    radius = const(7.dp),
+                    strokeColor = const(Color.White),
+                    strokeWidth = const(2.dp),
+                )
+            }
 
             if (userPosition != null) {
                 val userSource = rememberGeoJsonSource(
@@ -116,6 +151,11 @@ fun MapScreen(
                     strokeWidth = const(2.dp),
                 )
             }
+        }
+
+        LaunchedEffect(parkingPosition) {
+            val target = parkingPosition ?: return@LaunchedEffect
+            mapState.setCameraPosition(CameraPosition(target = target, zoom = 17.0))
         }
 
         Box(
@@ -133,3 +173,8 @@ fun MapScreen(
 
 private fun pointFeatureJson(position: Position): String =
     """{"type":"FeatureCollection","features":[{"type":"Feature","properties":{},"geometry":{"type":"Point","coordinates":[${position.longitude},${position.latitude}]}}]}"""
+
+private fun formatTimestamp(timestamp: Long): String =
+    DateTimeFormatter
+        .ofLocalizedDateTime(FormatStyle.MEDIUM)
+        .format(Instant.ofEpochMilli(timestamp).atZone(ZoneId.systemDefault()))

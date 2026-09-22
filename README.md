@@ -81,7 +81,7 @@ should take you to the settings area to allow installation if not already enable
 ## Getting Started
 
 1. [Install](#Install) and open the app.
-2. Go to the Automation tab to add Devices.
+2. Go to the Automatic tab to add Devices.
 3. View your History on the home page.
 4. Click on a history item to see the map.
 

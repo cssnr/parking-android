@@ -6,10 +6,10 @@ import org.cssnr.parking.data.db.History
 import java.time.Instant
 
 /**
- * Coordinates the disconnect -> check automation prefs -> best location -> Room history add.
+ * Coordinates the disconnect -> check automatic prefs -> best location -> Room history add.
  */
 class ParkingRecorder(
-    private val automationRepository: AutomationRepository,
+    private val automaticRepository: AutomaticRepository,
     private val historyRepository: HistoryRepository,
     private val locationProvider: LocationProvider,
 ) {
@@ -22,12 +22,12 @@ class ParkingRecorder(
     suspend fun recordDisconnect(address: String, name: String?): Boolean {
         Log.d("ParkingRecorder", "recordDisconnect - address: $address name: $name")
         if (address.isBlank()) return false
-        if (!automationRepository.automationEnabled.first()) return false
+        if (!automaticRepository.automaticEnabled.first()) return false
         Log.d(
             "ParkingRecorder",
-            "selectedBluetoothDevices: ${automationRepository.selectedBluetoothDevices}"
+            "selectedBluetoothDevices: ${automaticRepository.selectedBluetoothDevices}"
         )
-        val selected = automationRepository.selectedBluetoothDevices.first()
+        val selected = automaticRepository.selectedBluetoothDevices.first()
         Log.d("ParkingRecorder", "selected: $selected")
         if (address !in selected) return false
         val location = locationProvider.getBestLocation() ?: return false

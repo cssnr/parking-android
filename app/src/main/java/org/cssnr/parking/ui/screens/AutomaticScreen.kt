@@ -56,13 +56,13 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import org.cssnr.parking.ui.theme.ParKingTheme
-import org.cssnr.parking.ui.viewmodel.AutomationViewModel
+import org.cssnr.parking.ui.viewmodel.AutomaticViewModel
 
 @Composable
-fun AutomationRoute(viewModel: AutomationViewModel = viewModel()) {
+fun AutomaticRoute(viewModel: AutomaticViewModel = viewModel()) {
     val context = LocalContext.current
 
-    val automationEnabled by viewModel.automationEnabled.collectAsStateWithLifecycle()
+    val automaticEnabled by viewModel.automaticEnabled.collectAsStateWithLifecycle()
     val selectedBluetoothDevices by viewModel.selectedBluetoothDevices.collectAsStateWithLifecycle()
 
     var fineLocationGranted by remember { mutableStateOf(context.hasFineLocationPermission()) }
@@ -79,7 +79,7 @@ fun AutomationRoute(viewModel: AutomationViewModel = viewModel()) {
     ) { granted ->
         backgroundLocationGranted = granted
         if (granted) {
-            viewModel.setAutomationEnabled(true)
+            viewModel.setAutomaticEnabled(true)
         }
     }
 
@@ -89,7 +89,7 @@ fun AutomationRoute(viewModel: AutomationViewModel = viewModel()) {
         fineLocationGranted = granted
         if (granted) {
             if (context.hasBackgroundLocationPermission()) {
-                viewModel.setAutomationEnabled(true)
+                viewModel.setAutomaticEnabled(true)
             } else {
                 backgroundPermissionLauncher.launch(Manifest.permission.ACCESS_BACKGROUND_LOCATION)
             }
@@ -137,8 +137,8 @@ fun AutomationRoute(viewModel: AutomationViewModel = viewModel()) {
         }
     }
 
-    AutomationScreen(
-        automationEnabled = automationEnabled,
+    AutomaticScreen(
+        automaticEnabled = automaticEnabled,
         fineLocationGranted = fineLocationGranted,
         backgroundLocationGranted = backgroundLocationGranted,
         bluetoothConnectGranted = bluetoothConnectGranted,
@@ -154,7 +154,7 @@ fun AutomationRoute(viewModel: AutomationViewModel = viewModel()) {
         onPermissionRationaleDismiss = {
             showBackgroundRationaleDialog = false
         },
-        onAutomationToggle = { enabled ->
+        onAutomaticToggle = { enabled ->
             if (enabled) {
                 if (!fineLocationGranted) {
                     fineLocationLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
@@ -172,10 +172,10 @@ fun AutomationRoute(viewModel: AutomationViewModel = viewModel()) {
                         backgroundPermissionLauncher.launch(Manifest.permission.ACCESS_BACKGROUND_LOCATION)
                     }
                 } else {
-                    viewModel.setAutomationEnabled(true)
+                    viewModel.setAutomaticEnabled(true)
                 }
             } else {
-                viewModel.setAutomationEnabled(false)
+                viewModel.setAutomaticEnabled(false)
             }
         },
         onRequestBluetoothPermission = {
@@ -205,8 +205,8 @@ fun AutomationRoute(viewModel: AutomationViewModel = viewModel()) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AutomationScreen(
-    automationEnabled: Boolean,
+fun AutomaticScreen(
+    automaticEnabled: Boolean,
     fineLocationGranted: Boolean,
     backgroundLocationGranted: Boolean,
     bluetoothConnectGranted: Boolean,
@@ -215,12 +215,12 @@ fun AutomationScreen(
     showPermissionRationaleDialog: Boolean,
     onPermissionRationaleGrant: () -> Unit,
     onPermissionRationaleDismiss: () -> Unit,
-    onAutomationToggle: (Boolean) -> Unit,
+    onAutomaticToggle: (Boolean) -> Unit,
     onRequestBluetoothPermission: () -> Unit,
     onEditDevices: () -> Unit,
 ) {
     Scaffold(
-        topBar = { TopAppBar(title = { Text("Automation") }) },
+        topBar = { TopAppBar(title = { Text("Automatic Parking") }) },
     ) { innerPadding ->
         Column(
             modifier = Modifier
@@ -229,12 +229,12 @@ fun AutomationScreen(
                 .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            DefineAutomationTile(
-                automationEnabled = automationEnabled,
+            DefineAutomaticTile(
+                automaticEnabled = automaticEnabled,
                 fineLocationGranted = fineLocationGranted,
                 backgroundLocationGranted = backgroundLocationGranted,
                 backgroundPermissionLabel = backgroundPermissionLabel,
-                onAutomationToggle = onAutomationToggle,
+                onAutomaticToggle = onAutomaticToggle,
             )
             DefineDevicesTile(
                 bluetoothConnectGranted = bluetoothConnectGranted,
@@ -251,7 +251,7 @@ fun AutomationScreen(
             title = { Text("Background Location Access") },
             text = {
                 Text(
-                    "Automation records your parking spot when your car disconnects, " +
+                    "Automatic records your parking spot when your car disconnects, " +
                         "even when the app is in the background. Choose \"All the time\" " +
                         "when prompted for location access."
                 )
@@ -271,12 +271,12 @@ fun AutomationScreen(
 }
 
 @Composable
-private fun DefineAutomationTile(
-    automationEnabled: Boolean,
+private fun DefineAutomaticTile(
+    automaticEnabled: Boolean,
     fineLocationGranted: Boolean,
     backgroundLocationGranted: Boolean,
     backgroundPermissionLabel: String,
-    onAutomationToggle: (Boolean) -> Unit,
+    onAutomaticToggle: (Boolean) -> Unit,
 ) {
     val subtitle = when {
         !fineLocationGranted -> "Location permission not granted."
@@ -284,14 +284,14 @@ private fun DefineAutomationTile(
             "Needs background location. Enable \"$backgroundPermissionLabel\" in Settings."
         else -> "Records your parking spot when your car disconnects."
     }
-    AutomationCard(
+    AutomaticCard(
         icon = Icons.Filled.Power,
-        title = "Automation",
+        title = "Automatic",
         subtitle = subtitle,
         action = {
             Switch(
-                checked = automationEnabled,
-                onCheckedChange = onAutomationToggle,
+                checked = automaticEnabled,
+                onCheckedChange = onAutomaticToggle,
             )
         },
     )
@@ -309,7 +309,7 @@ private fun DefineDevicesTile(
         selectedDeviceNames.isEmpty() -> "Choose which Bluetooth devices this works with."
         else -> selectedDeviceNames.joinToString(", ")
     }
-    AutomationCard(
+    AutomaticCard(
         icon = Icons.Filled.Bluetooth,
         title = "Devices",
         subtitle = subtitle,
@@ -412,7 +412,7 @@ private fun DevicePickerDialog(
 }
 
 @Composable
-private fun AutomationCard(
+private fun AutomaticCard(
     icon: ImageVector,
     title: String,
     subtitle: String,
@@ -488,10 +488,10 @@ private fun Context.shouldShowPermissionRationale(permission: String): Boolean =
 
 @Preview(showBackground = true)
 @Composable
-fun AutomationScreenPreview() {
+fun AutomaticScreenPreview() {
     ParKingTheme {
-        AutomationScreen(
-            automationEnabled = false,
+        AutomaticScreen(
+            automaticEnabled = false,
             fineLocationGranted = true,
             backgroundLocationGranted = false,
             bluetoothConnectGranted = false,
@@ -500,7 +500,7 @@ fun AutomationScreenPreview() {
             showPermissionRationaleDialog = true,
             onPermissionRationaleGrant = {},
             onPermissionRationaleDismiss = {},
-            onAutomationToggle = {},
+            onAutomaticToggle = {},
             onRequestBluetoothPermission = {},
             onEditDevices = {},
         )

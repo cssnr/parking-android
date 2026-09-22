@@ -33,10 +33,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import org.cssnr.parking.R
 import org.cssnr.parking.data.db.History
 import org.cssnr.parking.ui.theme.ParKingTheme
 import org.cssnr.parking.ui.viewmodel.HistoryViewModel
@@ -152,12 +154,21 @@ private fun HistoryRow(
                 .padding(horizontal = 16.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Icon(
-                imageVector = Icons.Filled.Bluetooth,
-                contentDescription = null,
-                modifier = Modifier.size(24.dp),
-                tint = MaterialTheme.colorScheme.primary,
-            )
+            if (record.bluetoothAddress.isBlank()) {
+                Icon(
+                    painter = painterResource(R.drawable.md_pin_road_24px),
+                    contentDescription = null,
+                    modifier = Modifier.size(24.dp),
+                    tint = MaterialTheme.colorScheme.primary,
+                )
+            } else {
+                Icon(
+                    imageVector = Icons.Filled.Bluetooth,
+                    contentDescription = null,
+                    modifier = Modifier.size(24.dp),
+                    tint = MaterialTheme.colorScheme.primary,
+                )
+            }
             Spacer(modifier = Modifier.width(16.dp))
             Column(
                 modifier = Modifier
@@ -169,11 +180,13 @@ private fun HistoryRow(
                     text = record.bluetoothName ?: record.bluetoothAddress,
                     style = MaterialTheme.typography.titleMedium,
                 )
-                Text(
-                    text = record.bluetoothAddress,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                if (record.bluetoothAddress.isNotBlank()) {
+                    Text(
+                        text = record.bluetoothAddress,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
                 Text(
                     text = formatLocation(record),
                     style = MaterialTheme.typography.bodyMedium,

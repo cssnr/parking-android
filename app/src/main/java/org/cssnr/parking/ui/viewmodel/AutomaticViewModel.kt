@@ -7,20 +7,13 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import org.cssnr.parking.data.AutomationRepository
+import org.cssnr.parking.data.AutomaticRepository
 
-class AutomationViewModel(application: Application) : AndroidViewModel(application) {
+class AutomaticViewModel(application: Application) : AndroidViewModel(application) {
 
-    private val automationRepository = AutomationRepository(application)
+    private val automaticRepository = AutomaticRepository(application)
 
-    val automationEnabled: StateFlow<Boolean> = automationRepository.automationEnabled
-        .stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.Eagerly,
-            initialValue = false,
-        )
-
-    val locationPermissionRequested: StateFlow<Boolean> = automationRepository.locationPermissionRequested
+    val automaticEnabled: StateFlow<Boolean> = automaticRepository.automaticEnabled
         .stateIn(
             scope = viewModelScope,
             started = SharingStarted.Eagerly,
@@ -28,7 +21,7 @@ class AutomationViewModel(application: Application) : AndroidViewModel(applicati
         )
 
     val backgroundPermissionRequested: StateFlow<Boolean> =
-        automationRepository.backgroundPermissionRequested
+        automaticRepository.backgroundPermissionRequested
             .stateIn(
                 scope = viewModelScope,
                 started = SharingStarted.Eagerly,
@@ -36,34 +29,28 @@ class AutomationViewModel(application: Application) : AndroidViewModel(applicati
             )
 
     val selectedBluetoothDevices: StateFlow<Set<String>> =
-        automationRepository.selectedBluetoothDevices
+        automaticRepository.selectedBluetoothDevices
             .stateIn(
                 scope = viewModelScope,
                 started = SharingStarted.Eagerly,
                 initialValue = emptySet(),
             )
 
-    fun setAutomationEnabled(enabled: Boolean) {
+    fun setAutomaticEnabled(enabled: Boolean) {
         viewModelScope.launch {
-            automationRepository.setAutomationEnabled(enabled)
-        }
-    }
-
-    fun markLocationPermissionRequested() {
-        viewModelScope.launch {
-            automationRepository.markLocationPermissionRequested()
+            automaticRepository.setAutomaticEnabled(enabled)
         }
     }
 
     fun markBackgroundPermissionRequested() {
         viewModelScope.launch {
-            automationRepository.markBackgroundPermissionRequested()
+            automaticRepository.markBackgroundPermissionRequested()
         }
     }
 
     fun setSelectedBluetoothDevices(addresses: Set<String>) {
         viewModelScope.launch {
-            automationRepository.setSelectedBluetoothDevices(addresses)
+            automaticRepository.setSelectedBluetoothDevices(addresses)
         }
     }
 }
