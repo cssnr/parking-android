@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="108" height="108" viewBox="0 0 108 108">
+  <!-- land -->
+  <rect width="108" height="108" fill="#F2F0EA"/>
+  <!-- park (top-left, inner corner pulled toward the center) -->
+  <path d="M0 0H56C57 18 54 32 46 42C32 47 14 44 0 46Z" fill="#C8E6C9"/>
+  <!-- water (bottom-left) -->
+  <path d="M0 90C8 88 14 96 17 108H0Z" fill="#AADAFF"/>
+
+  <!-- road casings (outlines) -->
+  <path d="M20 111.7L125 38.2" stroke="#E3A72F" stroke-width="9" fill="none"/>
+  <path d="M69.7 -15L94.7 123" stroke="#E3A72F" stroke-width="9" fill="none"/>
+  <!-- road fills (drawn after both casings so the two roads merge at the junction) -->
+  <path d="M20 111.7L125 38.2" stroke="#FBD36B" stroke-width="6.5" fill="none"/>
+  <path d="M69.7 -15L94.7 123" stroke="#FBD36B" stroke-width="6.5" fill="none"/>
+</svg>

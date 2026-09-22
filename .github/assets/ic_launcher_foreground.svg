@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="108" height="108" viewBox="0 0 108 108">
+  <!-- soft drop shadow (plain semi-transparent circle, no filters, so Android Studio imports it cleanly) -->
+  <circle cx="54" cy="56" r="22" fill="#000000" fill-opacity="0.18"/>
+  <!-- blue badge with white ring so it separates from the map -->
+  <circle cx="54" cy="54" r="21" fill="#1A73E8" stroke="#FFFFFF" stroke-width="2.5"/>
+  <!-- letter P drawn as a path (fonts don't survive the trip into an Android vector drawable) -->
+  <path fill="#FFFFFF" fill-rule="evenodd"
+        d="M45 41H54.5A8.5 8.5 0 0 1 54.5 58H50.5V67H45Z
+           M50.5 46.5H54.5A3 3 0 0 1 54.5 52.5H50.5Z"/>
+</svg>

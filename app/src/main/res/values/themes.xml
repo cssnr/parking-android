@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools">
+
+    <style name="Theme.ParKing" parent="android:Theme.Material.Light.NoActionBar" />
+
+    <!--&lt;!&ndash; https://developer.android.com/develop/ui/views/launch/splash-screen &ndash;&gt;-->
+    <!--<style name="Theme.ParKing.Starting" parent="Theme.SplashScreen">-->
+    <!--    <item name="windowSplashScreenBackground">@color/ic_launcher_background</item>-->
+    <!--    <item name="windowSplashScreenAnimatedIcon">@drawable/ic_launcher_foreground</item>-->
+    <!--    <item name="postSplashScreenTheme">@style/Theme.ParKing</item>-->
+    <!--    &lt;!&ndash; https://developer.android.com/reference/android/R.attr#windowSplashScreenBehavior &ndash;&gt;-->
+    <!--    <item name="android:windowSplashScreenBehavior" tools:targetApi="33">icon_preferred</item>-->
+    <!--</style>-->
+</resources>
