@@ -20,11 +20,16 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import org.maplibre.compose.location.LocationPermission
 import org.maplibre.compose.location.rememberDefaultLocationProvider
 import org.maplibre.compose.location.rememberLocationState
+import org.cssnr.parking.ui.AutomaticTrackingStatus
 import org.cssnr.parking.ui.navigation.MapDetail
 import org.cssnr.parking.ui.viewmodel.LocationViewModel
 
 @Composable
-fun LocationRoute(viewModel: LocationViewModel = viewModel()) {
+fun LocationRoute(
+    viewModel: LocationViewModel = viewModel(),
+    trackingStatus: AutomaticTrackingStatus? = null,
+    onTrackingStatusClick: () -> Unit = {},
+) {
     val uiState by viewModel.locationUiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
 
@@ -83,6 +88,8 @@ fun LocationRoute(viewModel: LocationViewModel = viewModel()) {
         title = detail?.title ?: "Location",
         userPosition = locationState.lastLocation?.position,
         onBack = null,
+        trackingStatus = trackingStatus,
+        onTrackingStatusClick = onTrackingStatusClick,
     )
 
     val showInitialPrompt = uiState.shouldShowInitialPrompt &&

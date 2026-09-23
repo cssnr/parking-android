@@ -57,6 +57,14 @@ fun ParKingApp() {
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = backStackEntry?.destination
 
+    val trackingStatus = rememberAutomaticTrackingStatus()
+    val onTrackingStatusClick = {
+        navController.navigate(Automatic) {
+            popUpTo(navController.graph.findStartDestination().id)
+            launchSingleTop = true
+        }
+    }
+
     Scaffold(
         contentWindowInsets = ScaffoldDefaults.contentWindowInsets
             .only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom),
@@ -103,10 +111,15 @@ fun ParKingApp() {
                 .consumeWindowInsets(innerPadding),
         ) {
             composable<Location> {
-                LocationRoute()
+                LocationRoute(
+                    trackingStatus = trackingStatus,
+                    onTrackingStatusClick = onTrackingStatusClick,
+                )
             }
             composable<History> {
                 HistoryRoute(
+                    trackingStatus = trackingStatus,
+                    onTrackingStatusClick = onTrackingStatusClick,
                     onRecordClick = { record ->
                         navController.navigate(
                             MapDetail(
@@ -126,13 +139,21 @@ fun ParKingApp() {
                     detail = detail,
                     title = detail.title,
                     onBack = { navController.popBackStack() },
+                    trackingStatus = trackingStatus,
+                    onTrackingStatusClick = onTrackingStatusClick,
                 )
             }
             composable<Automatic> {
-                AutomaticRoute()
+                AutomaticRoute(
+                    trackingStatus = trackingStatus,
+                    onTrackingStatusClick = onTrackingStatusClick,
+                )
             }
             composable<Settings> {
-                SettingsRoute()
+                SettingsRoute(
+                    trackingStatus = trackingStatus,
+                    onTrackingStatusClick = onTrackingStatusClick,
+                )
             }
         }
     }

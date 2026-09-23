@@ -1,5 +1,6 @@
 package org.cssnr.parking.data
 
+import android.content.Context
 import android.util.Log
 import kotlinx.coroutines.flow.first
 import org.cssnr.parking.data.db.History
@@ -12,6 +13,7 @@ class ParkingRecorder(
     private val automaticRepository: AutomaticRepository,
     private val historyRepository: HistoryRepository,
     private val locationProvider: LocationProvider,
+    private val context: Context,
 ) {
 
     /**
@@ -23,6 +25,7 @@ class ParkingRecorder(
         Log.d("ParkingRecorder", "recordDisconnect - address: $address name: $name")
         if (address.isBlank()) return false
         if (!automaticRepository.automaticEnabled.first()) return false
+        if (!LocationProvider.hasLocationPermission(context)) return false
         Log.d(
             "ParkingRecorder",
             "selectedBluetoothDevices: ${automaticRepository.selectedBluetoothDevices}"

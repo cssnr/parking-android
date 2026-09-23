@@ -5,8 +5,11 @@ import android.annotation.SuppressLint
 import android.app.Activity
 import android.bluetooth.BluetoothManager
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
+import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
@@ -24,9 +27,13 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bluetooth
+import androidx.compose.material.icons.filled.ErrorOutline
+import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.Power
+import androidx.compose.material.icons.filled.ShareLocation
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -45,6 +52,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
@@ -55,17 +63,24 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import org.cssnr.parking.data.LocationProvider
+import org.cssnr.parking.ui.AutomaticTrackingHeader
+import org.cssnr.parking.ui.AutomaticTrackingStatus
 import org.cssnr.parking.ui.theme.ParKingTheme
 import org.cssnr.parking.ui.viewmodel.AutomaticViewModel
 
 @Composable
-fun AutomaticRoute(viewModel: AutomaticViewModel = viewModel()) {
+fun AutomaticRoute(
+    viewModel: AutomaticViewModel = viewModel(),
+    trackingStatus: AutomaticTrackingStatus? = null,
+    onTrackingStatusClick: () -> Unit = {},
+) {
     val context = LocalContext.current
 
     val automaticEnabled by viewModel.automaticEnabled.collectAsStateWithLifecycle()
     val selectedBluetoothDevices by viewModel.selectedBluetoothDevices.collectAsStateWithLifecycle()
 
-    var fineLocationGranted by remember { mutableStateOf(context.hasFineLocationPermission()) }
+    var fineLocationGranted by remember { mutableStateOf(LocationProvider.hasLocationPermission(context)) }
     var backgroundLocationGranted by remember {
         mutableStateOf(context.hasBackgroundLocationPermission())
     }
@@ -73,27 +88,60 @@ fun AutomaticRoute(viewModel: AutomaticViewModel = viewModel()) {
     var showBackgroundRationaleDialog by remember { mutableStateOf(false) }
     var showDevicePicker by remember { mutableStateOf(false) }
     var pairedDevices by remember { mutableStateOf(emptyList<BondedDevice>()) }
+    var pendingBackgroundRequest by remember { mutableStateOf(false) }
+    var autoEnablePending by remember { mutableStateOf(false) }
+
+    val openBackgroundLocationSettings = {
+        val intent = Intent(
+            Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+            Uri.fromParts("package", context.packageName, null),
+        )
+        context.startActivity(intent)
+    }
 
     val backgroundPermissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { granted ->
         backgroundLocationGranted = granted
         if (granted) {
-            viewModel.setAutomaticEnabled(true)
+            if (autoEnablePending) {
+                autoEnablePending = false
+                viewModel.setAutomaticEnabled(true)
+            }
+        } else {
+            autoEnablePending = false
+            if (
+                Build.VERSION.SDK_INT >= Build.VERSION_CODES.R &&
+                !context.shouldShowPermissionRationale(Manifest.permission.ACCESS_BACKGROUND_LOCATION)
+            ) {
+                openBackgroundLocationSettings()
+            }
+        }
+    }
+
+    val requestBackgroundLocation = {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            backgroundPermissionLauncher.launch(Manifest.permission.ACCESS_BACKGROUND_LOCATION)
         }
     }
 
     val fineLocationLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { granted ->
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { results ->
+        val granted = results[Manifest.permission.ACCESS_FINE_LOCATION] == true ||
+            results[Manifest.permission.ACCESS_COARSE_LOCATION] == true
         fineLocationGranted = granted
-        if (granted) {
+        if (granted && pendingBackgroundRequest) {
             if (context.hasBackgroundLocationPermission()) {
-                viewModel.setAutomaticEnabled(true)
+                if (autoEnablePending) {
+                    autoEnablePending = false
+                    viewModel.setAutomaticEnabled(true)
+                }
             } else {
-                backgroundPermissionLauncher.launch(Manifest.permission.ACCESS_BACKGROUND_LOCATION)
+                requestBackgroundLocation()
             }
         }
+        pendingBackgroundRequest = false
     }
 
     val bluetoothPermissionLauncher = rememberLauncherForActivityResult(
@@ -120,7 +168,7 @@ fun AutomaticRoute(viewModel: AutomaticViewModel = viewModel()) {
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
-                fineLocationGranted = context.hasFineLocationPermission()
+                fineLocationGranted = LocationProvider.hasLocationPermission(context)
                 backgroundLocationGranted = context.hasBackgroundLocationPermission()
                 bluetoothConnectGranted = context.hasBluetoothConnectPermission()
             }
@@ -147,17 +195,23 @@ fun AutomaticRoute(viewModel: AutomaticViewModel = viewModel()) {
         showPermissionRationaleDialog = showBackgroundRationaleDialog,
         onPermissionRationaleGrant = {
             showBackgroundRationaleDialog = false
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                backgroundPermissionLauncher.launch(Manifest.permission.ACCESS_BACKGROUND_LOCATION)
-            }
+            requestBackgroundLocation()
         },
         onPermissionRationaleDismiss = {
             showBackgroundRationaleDialog = false
+            autoEnablePending = false
         },
         onAutomaticToggle = { enabled ->
             if (enabled) {
+                pendingBackgroundRequest = true
+                autoEnablePending = true
                 if (!fineLocationGranted) {
-                    fineLocationLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+                    fineLocationLauncher.launch(
+                        arrayOf(
+                            Manifest.permission.ACCESS_FINE_LOCATION,
+                            Manifest.permission.ACCESS_COARSE_LOCATION,
+                        )
+                    )
                 } else if (
                     Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q &&
                     !backgroundLocationGranted
@@ -169,12 +223,16 @@ fun AutomaticRoute(viewModel: AutomaticViewModel = viewModel()) {
                         showBackgroundRationaleDialog = true
                     } else {
                         viewModel.markBackgroundPermissionRequested()
-                        backgroundPermissionLauncher.launch(Manifest.permission.ACCESS_BACKGROUND_LOCATION)
+                        requestBackgroundLocation()
                     }
                 } else {
+                    autoEnablePending = false
+                    pendingBackgroundRequest = false
                     viewModel.setAutomaticEnabled(true)
                 }
             } else {
+                pendingBackgroundRequest = false
+                autoEnablePending = false
                 viewModel.setAutomaticEnabled(false)
             }
         },
@@ -186,6 +244,34 @@ fun AutomaticRoute(viewModel: AutomaticViewModel = viewModel()) {
         onEditDevices = {
             showDevicePicker = true
         },
+        onRequestFineLocation = {
+            pendingBackgroundRequest = false
+            autoEnablePending = false
+            fineLocationLauncher.launch(
+                arrayOf(
+                    Manifest.permission.ACCESS_FINE_LOCATION,
+                    Manifest.permission.ACCESS_COARSE_LOCATION,
+                )
+            )
+        },
+        onRequestBackgroundLocation = {
+            if (!fineLocationGranted) {
+                pendingBackgroundRequest = true
+                autoEnablePending = false
+                fineLocationLauncher.launch(
+                    arrayOf(
+                        Manifest.permission.ACCESS_FINE_LOCATION,
+                        Manifest.permission.ACCESS_COARSE_LOCATION,
+                    )
+                )
+            } else {
+                pendingBackgroundRequest = false
+                autoEnablePending = false
+                requestBackgroundLocation()
+            }
+        },
+        trackingStatus = trackingStatus,
+        onTrackingStatusClick = onTrackingStatusClick,
     )
 
     if (showDevicePicker && bluetoothConnectGranted) {
@@ -218,9 +304,23 @@ fun AutomaticScreen(
     onAutomaticToggle: (Boolean) -> Unit,
     onRequestBluetoothPermission: () -> Unit,
     onEditDevices: () -> Unit,
+    onRequestFineLocation: () -> Unit,
+    onRequestBackgroundLocation: () -> Unit,
+    trackingStatus: AutomaticTrackingStatus? = null,
+    onTrackingStatusClick: () -> Unit = {},
 ) {
     Scaffold(
-        topBar = { TopAppBar(title = { Text("Automatic Parking") }) },
+        topBar = {
+            TopAppBar(
+                title = { Text("Automatic Parking") },
+                actions = {
+                    AutomaticTrackingHeader(
+                        status = trackingStatus,
+                        onClick = onTrackingStatusClick,
+                    )
+                },
+            )
+        },
     ) { innerPadding ->
         Column(
             modifier = Modifier
@@ -229,6 +329,15 @@ fun AutomaticScreen(
                 .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
+            if (
+                automaticEnabled &&
+                (!fineLocationGranted || !backgroundLocationGranted)
+            ) {
+                PermissionWarningBanner(
+                    fineLocationGranted = fineLocationGranted,
+                    backgroundLocationGranted = backgroundLocationGranted,
+                )
+            }
             DefineAutomaticTile(
                 automaticEnabled = automaticEnabled,
                 fineLocationGranted = fineLocationGranted,
@@ -241,6 +350,15 @@ fun AutomaticScreen(
                 selectedDeviceNames = selectedDeviceNames,
                 onRequestBluetoothPermission = onRequestBluetoothPermission,
                 onEditDevices = onEditDevices,
+            )
+            DefineGrantLocationTile(
+                fineLocationGranted = fineLocationGranted,
+                onRequestFineLocation = onRequestFineLocation,
+            )
+            DefineGrantBackgroundLocationTile(
+                fineLocationGranted = fineLocationGranted,
+                backgroundLocationGranted = backgroundLocationGranted,
+                onRequestBackgroundLocation = onRequestBackgroundLocation,
             )
         }
     }
@@ -267,6 +385,44 @@ fun AutomaticScreen(
                 }
             },
         )
+    }
+}
+
+@Composable
+private fun PermissionWarningBanner(
+    fineLocationGranted: Boolean,
+    backgroundLocationGranted: Boolean,
+) {
+    val warning = when {
+        !fineLocationGranted && !backgroundLocationGranted ->
+            "Location and background location permissions are missing."
+        !fineLocationGranted ->
+            "Location permission is missing. Automatic parking can't record your spot."
+        else ->
+            "Background location permission is missing. Automatic parking can't record in the background."
+    }
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.errorContainer,
+        ),
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                imageVector = Icons.Filled.ErrorOutline,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onErrorContainer,
+            )
+            Spacer(modifier = Modifier.width(12.dp))
+            Text(
+                text = warning,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onErrorContainer,
+            )
+        }
     }
 }
 
@@ -325,6 +481,52 @@ private fun DefineDevicesTile(
                     Text(if (bluetoothConnectGranted) "Edit" else "Allow")
                 }
             }
+        },
+    )
+}
+
+@Composable
+private fun DefineGrantLocationTile(
+    fineLocationGranted: Boolean,
+    onRequestFineLocation: () -> Unit,
+) {
+    val subtitle = if (fineLocationGranted) {
+        "Location permission granted."
+    } else {
+        "Required to record your parking spot when your car disconnects."
+    }
+    AutomaticCard(
+        icon = Icons.Filled.ShareLocation,
+        title = "Grant Location Permissions",
+        subtitle = subtitle,
+        modifier = if (fineLocationGranted) {
+            Modifier.alpha(0.5f)
+        } else {
+            Modifier.clickable { onRequestFineLocation() }
+        },
+    )
+}
+
+@Composable
+private fun DefineGrantBackgroundLocationTile(
+    fineLocationGranted: Boolean,
+    backgroundLocationGranted: Boolean,
+    onRequestBackgroundLocation: () -> Unit,
+) {
+    val subtitle = when {
+        backgroundLocationGranted && fineLocationGranted ->
+            "Location and background access granted."
+        !fineLocationGranted -> "Grants location and background access as needed."
+        else -> "Required to record parking while the app is in the background."
+    }
+    AutomaticCard(
+        icon = Icons.Filled.Layers,
+        title = "Grant Background Location",
+        subtitle = subtitle,
+        modifier = if (backgroundLocationGranted && fineLocationGranted) {
+            Modifier.alpha(0.5f)
+        } else {
+            Modifier.clickable { onRequestBackgroundLocation() }
         },
     )
 }
@@ -469,10 +671,6 @@ private fun Context.getPairedDevices(): List<BondedDevice> {
         ?: emptyList()
 }
 
-private fun Context.hasFineLocationPermission(): Boolean =
-    ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) ==
-        PackageManager.PERMISSION_GRANTED
-
 private fun Context.hasBackgroundLocationPermission(): Boolean =
     Build.VERSION.SDK_INT < Build.VERSION_CODES.Q ||
         ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_BACKGROUND_LOCATION) ==
@@ -503,6 +701,8 @@ fun AutomaticScreenPreview() {
             onAutomaticToggle = {},
             onRequestBluetoothPermission = {},
             onEditDevices = {},
+            onRequestFineLocation = {},
+            onRequestBackgroundLocation = {},
         )
     }
 }

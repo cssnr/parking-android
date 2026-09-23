@@ -78,18 +78,26 @@ should take you to the settings area to allow installation if not already enable
 
 </details>
 
+_The GitHub APK has been registered with Google's [Android developer verification](https://developer.android.com/developer-verification)._
+
+```
+EB:3C:65:A6:C9:63:4A:27:07:C2:0F:AC:C7:0E:A5:CD:2A:73:93:40:D9:5D:78:3B:21:7A:34:C6:87:AF:01:92
+```
+
+[_How to Verify an APK Signature_](https://developer.android.com/tools/apksigner#usage-verify)
+
 ## Getting Started
 
 1. [Install](#Install) and open the app.
 2. Go to the Automatic tab to add Devices.
-3. View your History on the home page.
+3. Open the History tab to view your parking history.
 4. Click on a history item to see the map.
 
 ## Features
 
 - Automatic Parking Detection
 - Supports Multiple Bluetooth Devices
-- Full Location History Location Maps
+- Full History with Location Maps
 
 ### Planned
 

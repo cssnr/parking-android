@@ -30,6 +30,8 @@ import org.maplibre.compose.sources.GeoJsonData
 import org.maplibre.compose.sources.rememberGeoJsonSource
 import org.maplibre.compose.style.BaseStyle
 import org.maplibre.spatialk.geojson.Position
+import org.cssnr.parking.ui.AutomaticTrackingHeader
+import org.cssnr.parking.ui.AutomaticTrackingStatus
 import org.cssnr.parking.ui.navigation.MapDetail
 import java.time.Instant
 import java.time.ZoneId
@@ -41,6 +43,8 @@ fun MapRoute(
     detail: MapDetail?,
     title: String,
     onBack: (() -> Unit)?,
+    trackingStatus: AutomaticTrackingStatus? = null,
+    onTrackingStatusClick: () -> Unit = {},
 ) {
     val locationProvider = rememberDefaultLocationProvider()
     val locationState = rememberLocationState(provider = locationProvider)
@@ -57,6 +61,8 @@ fun MapRoute(
         title = title,
         userPosition = locationState.lastLocation?.position,
         onBack = onBack,
+        trackingStatus = trackingStatus,
+        onTrackingStatusClick = onTrackingStatusClick,
     )
 }
 
@@ -68,6 +74,8 @@ fun MapScreen(
     userPosition: Position?,
     onBack: (() -> Unit)?,
     modifier: Modifier = Modifier,
+    trackingStatus: AutomaticTrackingStatus? = null,
+    onTrackingStatusClick: () -> Unit = {},
 ) {
     Scaffold(
         modifier = modifier,
@@ -108,6 +116,12 @@ fun MapScreen(
                             )
                         }
                     }
+                },
+                actions = {
+                    AutomaticTrackingHeader(
+                        status = trackingStatus,
+                        onClick = onTrackingStatusClick,
+                    )
                 },
             )
         },

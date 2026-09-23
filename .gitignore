@@ -15,6 +15,7 @@ out/
 captures/
 app/debug
 app/release
+temp/
 # App
 local.properties
 secret.properties

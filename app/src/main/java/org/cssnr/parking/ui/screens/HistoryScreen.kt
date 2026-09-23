@@ -40,6 +40,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import org.cssnr.parking.R
 import org.cssnr.parking.data.db.History
+import org.cssnr.parking.ui.AutomaticTrackingHeader
+import org.cssnr.parking.ui.AutomaticTrackingStatus
 import org.cssnr.parking.ui.theme.ParKingTheme
 import org.cssnr.parking.ui.viewmodel.HistoryViewModel
 import java.time.Instant
@@ -51,6 +53,8 @@ import java.util.Locale
 @Composable
 fun HistoryRoute(
     viewModel: HistoryViewModel = viewModel(),
+    trackingStatus: AutomaticTrackingStatus? = null,
+    onTrackingStatusClick: () -> Unit = {},
     onRecordClick: (History) -> Unit = {},
 ) {
     val history by viewModel.history.collectAsStateWithLifecycle()
@@ -60,6 +64,8 @@ fun HistoryRoute(
         history = history,
         onRecordClick = onRecordClick,
         onDeleteRequest = { deleteTarget = it },
+        trackingStatus = trackingStatus,
+        onTrackingStatusClick = onTrackingStatusClick,
     )
 
     deleteTarget?.let { record ->
@@ -93,10 +99,22 @@ fun HistoryScreen(
     onRecordClick: (History) -> Unit,
     onDeleteRequest: (History) -> Unit,
     modifier: Modifier = Modifier,
+    trackingStatus: AutomaticTrackingStatus? = null,
+    onTrackingStatusClick: () -> Unit = {},
 ) {
     Scaffold(
         modifier = modifier,
-        topBar = { TopAppBar(title = { Text("History") }) },
+        topBar = {
+            TopAppBar(
+                title = { Text("History") },
+                actions = {
+                    AutomaticTrackingHeader(
+                        status = trackingStatus,
+                        onClick = onTrackingStatusClick,
+                    )
+                },
+            )
+        },
     ) { innerPadding ->
         if (history.isEmpty()) {
             Column(

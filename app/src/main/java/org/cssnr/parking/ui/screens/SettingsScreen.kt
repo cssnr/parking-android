@@ -33,11 +33,17 @@ import androidx.core.net.toUri
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import org.cssnr.parking.R
+import org.cssnr.parking.ui.AutomaticTrackingHeader
+import org.cssnr.parking.ui.AutomaticTrackingStatus
 import org.cssnr.parking.ui.theme.ParKingTheme
 import org.cssnr.parking.ui.viewmodel.SettingsViewModel
 
 @Composable
-fun SettingsRoute(viewModel: SettingsViewModel = viewModel()) {
+fun SettingsRoute(
+    viewModel: SettingsViewModel = viewModel(),
+    trackingStatus: AutomaticTrackingStatus? = null,
+    onTrackingStatusClick: () -> Unit = {},
+) {
     val context = LocalContext.current
     val acraInfoLink = stringResource(R.string.acra_info_link)
     val crashReporting by viewModel.crashReporting.collectAsStateWithLifecycle()
@@ -50,6 +56,8 @@ fun SettingsRoute(viewModel: SettingsViewModel = viewModel()) {
                 Intent(Intent.ACTION_VIEW, acraInfoLink.toUri())
             )
         },
+        trackingStatus = trackingStatus,
+        onTrackingStatusClick = onTrackingStatusClick,
     )
 }
 
@@ -59,11 +67,23 @@ fun SettingsScreen(
     crashReporting: Boolean,
     onCrashReportingChange: (Boolean) -> Unit,
     onCrashReportingMoreInfo: () -> Unit,
+    trackingStatus: AutomaticTrackingStatus? = null,
+    onTrackingStatusClick: () -> Unit = {},
 ) {
     var showCrashReportingDialog by rememberSaveable { mutableStateOf(false) }
 
     Scaffold(
-        topBar = { TopAppBar(title = { Text("Settings") }) },
+        topBar = {
+            TopAppBar(
+                title = { Text("Settings") },
+                actions = {
+                    AutomaticTrackingHeader(
+                        status = trackingStatus,
+                        onClick = onTrackingStatusClick,
+                    )
+                },
+            )
+        },
     ) { innerPadding ->
         Column(
             modifier = Modifier
