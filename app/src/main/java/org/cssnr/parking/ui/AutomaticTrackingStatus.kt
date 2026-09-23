@@ -32,6 +32,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import kotlinx.coroutines.flow.combine
 import org.cssnr.parking.data.AutomaticRepository
 import org.cssnr.parking.data.LocationProvider
 
@@ -45,14 +46,21 @@ enum class AutomaticTrackingStatus {
 fun rememberAutomaticTrackingStatus(): AutomaticTrackingStatus? {
     val context = LocalContext.current
 
-    val automaticEnabled by remember(context) {
-        AutomaticRepository(context.applicationContext).automaticEnabled
+    val automaticConfig by remember(context) {
+        val repository = AutomaticRepository(context.applicationContext)
+        combine(
+            repository.automaticEnabled,
+            repository.selectedBluetoothDevices,
+        ) { enabled, devices -> enabled to devices }
     }.collectAsStateWithLifecycle(initialValue = null)
     var fineLocationGranted by remember {
         mutableStateOf(LocationProvider.hasLocationPermission(context))
     }
     var backgroundLocationGranted by remember {
         mutableStateOf(context.hasBackgroundLocationPermission())
+    }
+    var bluetoothConnectGranted by remember {
+        mutableStateOf(context.hasBluetoothConnectPermission())
     }
 
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -61,16 +69,22 @@ fun rememberAutomaticTrackingStatus(): AutomaticTrackingStatus? {
             if (event == Lifecycle.Event.ON_RESUME) {
                 fineLocationGranted = LocationProvider.hasLocationPermission(context)
                 backgroundLocationGranted = context.hasBackgroundLocationPermission()
+                bluetoothConnectGranted = context.hasBluetoothConnectPermission()
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
-    val enabled = automaticEnabled ?: return null
+    val (enabled, selectedDevices) = automaticConfig ?: return null
+
+    val missingPermission = !fineLocationGranted ||
+        !backgroundLocationGranted ||
+        !bluetoothConnectGranted
+    val noDeviceSelected = selectedDevices.isEmpty()
 
     return when {
-        enabled && (!fineLocationGranted || !backgroundLocationGranted) ->
+        enabled && (missingPermission || noDeviceSelected) ->
             AutomaticTrackingStatus.ERROR
         enabled -> AutomaticTrackingStatus.ENABLED
         else -> AutomaticTrackingStatus.DISABLED
@@ -123,4 +137,11 @@ private fun Context.hasBackgroundLocationPermission(): Boolean =
         ContextCompat.checkSelfPermission(
             this,
             Manifest.permission.ACCESS_BACKGROUND_LOCATION,
+        ) == PackageManager.PERMISSION_GRANTED
+
+private fun Context.hasBluetoothConnectPermission(): Boolean =
+    Build.VERSION.SDK_INT < Build.VERSION_CODES.S ||
+        ContextCompat.checkSelfPermission(
+            this,
+            Manifest.permission.BLUETOOTH_CONNECT,
         ) == PackageManager.PERMISSION_GRANTED
