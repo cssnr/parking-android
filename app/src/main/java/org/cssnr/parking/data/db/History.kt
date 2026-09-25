@@ -1,6 +1,5 @@
 package org.cssnr.parking.data.db
 
-import androidx.room3.ColumnInfo
 import androidx.room3.Embedded
 import androidx.room3.Entity
 import androidx.room3.PrimaryKey
@@ -16,40 +15,44 @@ import java.util.Locale
  *
  * Note there is no street-number field: [android.location.Address] has no
  * thoroughfare number accessor, the number arrives in [subThoroughfare] or [line].
+ *
+ * No property carries [androidx.room3.ColumnInfo]: Room applies the
+ * [Embedded] prefix to sub properties unconditionally, so a column name here
+ * could not change the resulting schema.
  */
 data class LocationAddress(
-    @ColumnInfo(name = "line")
     val line: String? = null,
-    @ColumnInfo(name = "featureName")
     val featureName: String? = null,
-    @ColumnInfo(name = "thoroughfare")
     val thoroughfare: String? = null,
-    @ColumnInfo(name = "subThoroughfare")
     val subThoroughfare: String? = null,
-    @ColumnInfo(name = "premises")
     val premises: String? = null,
-    @ColumnInfo(name = "adminArea")
     val adminArea: String? = null,
-    @ColumnInfo(name = "subAdminArea")
     val subAdminArea: String? = null,
-    @ColumnInfo(name = "locality")
     val locality: String? = null,
-    @ColumnInfo(name = "subLocality")
     val subLocality: String? = null,
-    @ColumnInfo(name = "postalCode")
     val postalCode: String? = null,
-    @ColumnInfo(name = "countryName")
     val countryName: String? = null,
-    @ColumnInfo(name = "countryCode")
     val countryCode: String? = null,
 ) {
     /**
      * Best available human readable label, or null when the geocoder had no data.
+     *
+     * [subThoroughfare] carries the street number and [subLocality] the district, so
+     * both belong in the fallback: leaving them out would silently truncate an
+     * address the provider did return.
      */
     val displayLabel: String?
         get() = line
-            ?: listOfNotNull(featureName, thoroughfare, locality, adminArea, countryName)
-                .joinToString(", ")
+            ?: listOfNotNull(
+                featureName,
+                thoroughfare,
+                subThoroughfare,
+                premises,
+                subLocality,
+                locality,
+                adminArea,
+                countryName,
+            ).joinToString(", ")
                 .ifBlank { null }
 }
 
@@ -66,9 +69,7 @@ data class History(
     // Location fix metadata. All nullable: the platform guarantees only latitude,
     // longitude, timestamp and accuracy on provider generated locations, and
     // LocationProvider.getBestLocation can fall back to a lastLocation of unknown age.
-    // [timestamp] is when the record was saved; [fixTimestamp] is when the position
-    // was actually measured. Their difference is the fix age.
-    val fixTimestamp: Long? = null,
+    // [fixAgeMillis] is how stale the fix was at the moment it was recorded.
     val fixAgeMillis: Long? = null,
     val accuracy: Float? = null,
 
@@ -80,6 +81,15 @@ data class History(
 
     @Embedded(prefix = "addr_")
     val address: LocationAddress = LocationAddress(),
+
+    // Set once a reverse geocode has succeeded, and that is the only thing the
+    // backfill keys off, so it must be set even when the provider returns an
+    // address with a null [LocationAddress.line]. Keying off the address columns
+    // instead would re-look-up those records on every launch forever.
+    //
+    // A lookup that returns nothing leaves this null so the record is retried. Kept
+    // nullable so MIGRATION_1_2 can add the column without a DEFAULT clause.
+    val geocoded: Boolean? = null,
 ) {
     /**
      * Best available label for this record: the reverse geocoded address when the

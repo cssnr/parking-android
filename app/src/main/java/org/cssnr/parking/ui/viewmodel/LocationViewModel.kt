@@ -68,31 +68,30 @@ class LocationViewModel(application: Application) : AndroidViewModel(application
      */
     fun addInitialLocation(fix: LocationFix) {
         viewModelScope.launch {
-            val id = historyRepository.add(
-                History(
-                    timestamp = System.currentTimeMillis(),
-                    latitude = fix.latitude,
-                    longitude = fix.longitude,
-                    bluetoothAddress = "",
-                    bluetoothName = "Manually Parked",
-                    fixTimestamp = fix.fixTimestamp,
-                    fixAgeMillis = fix.fixAgeMillis,
-                    accuracy = fix.accuracy,
-                    altitude = fix.altitude,
-                    verticalAccuracy = fix.verticalAccuracy,
-                )
+            val record = History(
+                timestamp = System.currentTimeMillis(),
+                latitude = fix.latitude,
+                longitude = fix.longitude,
+                bluetoothAddress = "",
+                bluetoothName = "Manually Parked",
+                fixAgeMillis = fix.fixAgeMillis,
+                accuracy = fix.accuracy,
+                altitude = fix.altitude,
+                verticalAccuracy = fix.verticalAccuracy,
             )
+            val id = historyRepository.add(record)
+            // Dismissed before the geocode, not after: the record already exists, so
+            // the prompt's precondition is met, and there is no reason to make the
+            // user wait on a network lookup for UI state that is already settled.
+            locationRepository.dismissInitialLocationPrompt()
             val address = withTimeoutOrNull(GEOCODE_TIMEOUT) {
                 runCatching { reverseGeocoder.reverseGeocode(fix.latitude, fix.longitude) }
                     .getOrNull()
             }
+            // Left unset on failure so the backfill retries this record later.
             if (address != null) {
-                historyRepository.update(
-                    historyRepository.getById(id)?.copy(address = address)
-                        ?: return@launch
-                )
+                historyRepository.update(record.copy(id = id, address = address, geocoded = true))
             }
-            locationRepository.dismissInitialLocationPrompt()
         }
     }
 

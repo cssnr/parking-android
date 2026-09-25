@@ -3,6 +3,8 @@ package org.cssnr.parking.ui.screens
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -53,6 +55,7 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
 import java.util.Locale
+import kotlin.math.roundToInt
 
 @Composable
 fun HistoryRoute(
@@ -231,11 +234,15 @@ private fun HistoryRow(
  * because these are unrelated quantities and a reader scanning the list should
  * be able to pick one out without parsing the ones next to it.
  *
+ * Laid out as a [FlowRow] so a wide accuracy value, a large font scale, or a long
+ * age all wrap to the next line instead of running off the edge of the card.
+ *
  * Altitude is height above the WGS84 reference ellipsoid, not above mean sea
  * level; the vertical accuracy beside it is what says whether it is worth
  * trusting. None of these were captured before schema version 2, so a record
  * saved by an older build renders nothing here.
  */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun FixDetails(record: History) {
     val accuracy = record.accuracy
@@ -243,14 +250,15 @@ private fun FixDetails(record: History) {
     val fixAge = record.fixAgeMillis
     if (accuracy == null && altitude == null && fixAge == null) return
 
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
+    FlowRow(
         horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(2.dp),
+        itemVerticalAlignment = Alignment.CenterVertically,
     ) {
         accuracy?.let {
             FixDetail(
                 icon = Icons.Filled.MyLocation,
-                label = String.format(Locale.US, "%dm", it.toInt()),
+                label = String.format(Locale.US, "%dm", it.roundToInt()),
                 description = "Horizontal accuracy",
             )
         }
@@ -258,7 +266,7 @@ private fun FixDetails(record: History) {
             val label = listOfNotNull(
                 String.format(Locale.US, "%.0fm", it),
                 record.verticalAccuracy?.let { accuracyMeters ->
-                    String.format(Locale.US, "+/-%dm", accuracyMeters.toInt())
+                    String.format(Locale.US, "+/-%dm", accuracyMeters.roundToInt())
                 },
             ).joinToString(" ")
             FixDetail(

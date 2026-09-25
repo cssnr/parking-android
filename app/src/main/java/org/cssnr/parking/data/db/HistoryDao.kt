@@ -17,11 +17,8 @@ interface HistoryDao {
     @Update
     suspend fun update(history: History)
 
-    @Query("SELECT * FROM history WHERE addr_line IS NULL ORDER BY timestamp ASC")
-    suspend fun getWithoutAddress(): List<History>
-
-    @Query("SELECT * FROM history WHERE id = :id")
-    suspend fun getById(id: Long): History?
+    @Query("SELECT * FROM history WHERE geocoded IS NULL ORDER BY timestamp ASC")
+    suspend fun getUngeocoded(): List<History>
 
     @Query("DELETE FROM history WHERE id = :id")
     suspend fun deleteById(id: Long)

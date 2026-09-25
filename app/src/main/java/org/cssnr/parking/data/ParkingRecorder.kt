@@ -49,7 +49,6 @@ class ParkingRecorder(
             longitude = fix.longitude,
             bluetoothAddress = address,
             bluetoothName = name,
-            fixTimestamp = fix.fixTimestamp,
             fixAgeMillis = fix.fixAgeMillis,
             accuracy = fix.accuracy,
             altitude = fix.altitude,
@@ -64,9 +63,13 @@ class ParkingRecorder(
     /**
      * Reverse geocodes the record and writes the address components back.
      *
-     * Bounded by [GEOCODE_TIMEOUT] because this runs inside the broadcast
-     * receiver's goAsync window. Any failure, including a timeout, is logged and
-     * dropped: the coordinates are already stored.
+     * Bounded by [GEOCODE_TIMEOUT] so a hung geocoder cannot stall the pipeline.
+     * That is not the whole budget: the receiver wraps this call in a total
+     * timeout, which is what actually bounds the broadcast.
+     *
+     * A failed lookup is dropped and the record left with [History.geocoded] unset,
+     * which is the signal for the backfill to retry it later. The coordinates are
+     * already stored either way.
      */
     private suspend fun attachAddress(record: History, fix: LocationFix) {
         val address = withTimeoutOrNull(GEOCODE_TIMEOUT) {
@@ -78,7 +81,7 @@ class ParkingRecorder(
             Log.w(TAG, "no address for record ${record.id}, keeping coordinates only")
             return
         }
-        historyRepository.update(record.copy(address = address))
+        historyRepository.update(record.copy(address = address, geocoded = true))
         Log.d(TAG, "record ${record.id} address: $address")
     }
 

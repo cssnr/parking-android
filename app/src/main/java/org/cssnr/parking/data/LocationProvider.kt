@@ -25,7 +25,6 @@ import kotlin.coroutines.resume
 data class LocationFix(
     val latitude: Double,
     val longitude: Double,
-    val fixTimestamp: Long,
     val fixAgeMillis: Long?,
     val accuracy: Float?,
     val altitude: Double?,
@@ -97,7 +96,6 @@ class LocationProvider(context: Context) {
 fun Location.toLocationFix(): LocationFix = LocationFix(
     latitude = latitude,
     longitude = longitude,
-    fixTimestamp = time,
     fixAgeMillis = if (elapsedRealtimeNanos > 0L) {
         ((SystemClock.elapsedRealtimeNanos() - elapsedRealtimeNanos) / NANOS_PER_MILLI)
             .coerceAtLeast(0L)
@@ -123,7 +121,6 @@ private const val NANOS_PER_MILLI = 1_000_000L
 fun LocationMeasurement.toLocationFix(): LocationFix = LocationFix(
     latitude = position.latitude,
     longitude = position.longitude,
-    fixTimestamp = measuredAt.toEpochMilliseconds(),
     fixAgeMillis = null,
     accuracy = horizontalAccuracy?.toFloat(Meters),
     altitude = position.altitude,

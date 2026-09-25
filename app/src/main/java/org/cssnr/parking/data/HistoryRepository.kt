@@ -17,9 +17,7 @@ class HistoryRepository(database: AppDatabase) {
         historyDao.update(history)
     }
 
-    suspend fun getWithoutAddress(): List<History> = historyDao.getWithoutAddress()
-
-    suspend fun getById(id: Long): History? = historyDao.getById(id)
+    suspend fun getUngeocoded(): List<History> = historyDao.getUngeocoded()
 
     suspend fun delete(id: Long) {
         historyDao.deleteById(id)

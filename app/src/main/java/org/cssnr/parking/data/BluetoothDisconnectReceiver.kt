@@ -9,8 +9,11 @@ import android.util.Log
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeout
 import org.cssnr.parking.data.db.AppDatabase
+import kotlin.time.Duration.Companion.seconds
 
 /**
  * Manifest-registered receiver for [BluetoothDevice.ACTION_ACL_DISCONNECTED].
@@ -22,7 +25,7 @@ class BluetoothDisconnectReceiver : BroadcastReceiver() {
 
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action != BluetoothDevice.ACTION_ACL_DISCONNECTED) return
-        Log.d("BTReceiver", "new intent - ACTION_ACL_DISCONNECTED")
+        Log.d(TAG, "new intent - ACTION_ACL_DISCONNECTED")
 
         val device: BluetoothDevice? =
             if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
@@ -31,11 +34,11 @@ class BluetoothDisconnectReceiver : BroadcastReceiver() {
                 @Suppress("DEPRECATION")
                 intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE)
             }
-        Log.d("BTReceiver", "device: $device")
+        Log.d(TAG, "device: $device")
         val address: String = device?.address ?: return
-        Log.d("BTReceiver", "address: $address")
+        Log.d(TAG, "address: $address")
         val name: String? = device.let(::safeDeviceName)
-        Log.d("BTReceiver", "name: $name")
+        Log.d(TAG, "name: $name")
 
         if (address.isBlank()) return
 
@@ -43,14 +46,18 @@ class BluetoothDisconnectReceiver : BroadcastReceiver() {
         val receiverScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
         receiverScope.launch {
             try {
-                val recorder = ParkingRecorder(
-                    AutomaticRepository(context.applicationContext),
-                    HistoryRepository(AppDatabase.getDatabase(context)),
-                    LocationProvider(context.applicationContext),
-                    ReverseGeocoder(context.applicationContext),
-                    context.applicationContext,
-                )
-                recorder.recordDisconnect(address, name)
+                withTimeout(RECEIVER_BUDGET) {
+                    val recorder = ParkingRecorder(
+                        AutomaticRepository(context.applicationContext),
+                        HistoryRepository(AppDatabase.getDatabase(context)),
+                        LocationProvider(context.applicationContext),
+                        ReverseGeocoder(context.applicationContext),
+                        context.applicationContext,
+                    )
+                    recorder.recordDisconnect(address, name)
+                }
+            } catch (_: TimeoutCancellationException) {
+                Log.w(TAG, "gave up after $RECEIVER_BUDGET, record not saved")
             } catch (e: Exception) {
                 e.printStackTrace()
             } finally {
@@ -66,4 +73,20 @@ class BluetoothDisconnectReceiver : BroadcastReceiver() {
     @SuppressLint("MissingPermission")
     private fun safeDeviceName(device: BluetoothDevice): String? =
         runCatching { device.name }.getOrNull()
+
+    companion object {
+        private const val TAG = "BTReceiver"
+
+        /**
+         * Total wall clock budget for the receiver, covering the location lookup and
+         * the reverse geocode together.
+         *
+         * goAsync keeps a broadcast alive for about 10 seconds before the system
+         * treats the receiver as non-responsive, so the whole pipeline is bounded
+         * below that. The per step timeouts inside are a convenience; this is the
+         * one that actually bounds the broadcast, and it is what turns a hung
+         * lookup into a dropped record instead of an ANR.
+         */
+        private val RECEIVER_BUDGET = 8.seconds
+    }
 }

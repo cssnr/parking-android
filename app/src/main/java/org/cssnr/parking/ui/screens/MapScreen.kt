@@ -192,17 +192,12 @@ private fun pointFeatureJson(position: Position): String =
 
 /**
  * The second title bar line: when the record was saved, then the device that
- * triggered it. The device segment is dropped when there is no device name, so a
- * manual save shows the date alone rather than a dangling separator.
+ * triggered it. [MapDetail.device] falls back to the bluetooth address and manual
+ * saves are labelled "Manually Parked", so it is never empty and there is no
+ * dangling separator case to handle.
  */
-private fun formatSubtitle(detail: MapDetail): String {
-    val timestamp = formatTimestamp(detail.timestamp)
-    return if (detail.device.isBlank()) {
-        timestamp
-    } else {
-        "$timestamp - ${detail.device}"
-    }
-}
+private fun formatSubtitle(detail: MapDetail): String =
+    "${formatTimestamp(detail.timestamp)} - ${detail.device}"
 
 private fun formatTimestamp(timestamp: Long): String =
     DateTimeFormatter
