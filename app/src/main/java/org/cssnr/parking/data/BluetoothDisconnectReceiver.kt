@@ -47,6 +47,7 @@ class BluetoothDisconnectReceiver : BroadcastReceiver() {
                     AutomaticRepository(context.applicationContext),
                     HistoryRepository(AppDatabase.getDatabase(context)),
                     LocationProvider(context.applicationContext),
+                    ReverseGeocoder(context.applicationContext),
                     context.applicationContext,
                 )
                 recorder.recordDisconnect(address, name)

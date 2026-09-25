@@ -12,6 +12,7 @@ data object History
 data class MapDetail(
     val id: Long,
     val title: String,
+    val device: String,
     val latitude: Double,
     val longitude: Double,
     val timestamp: Long,

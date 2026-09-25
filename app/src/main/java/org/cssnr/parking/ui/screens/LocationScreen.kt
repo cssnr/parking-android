@@ -20,6 +20,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import org.maplibre.compose.location.LocationPermission
 import org.maplibre.compose.location.rememberDefaultLocationProvider
 import org.maplibre.compose.location.rememberLocationState
+import org.cssnr.parking.data.toLocationFix
 import org.cssnr.parking.ui.AutomaticTrackingStatus
 import org.cssnr.parking.ui.navigation.MapDetail
 import org.cssnr.parking.ui.viewmodel.LocationViewModel
@@ -68,15 +69,16 @@ fun LocationRoute(
 
     LaunchedEffect(pendingSave, locationState.lastLocation) {
         if (!pendingSave) return@LaunchedEffect
-        val position = locationState.lastLocation?.position ?: return@LaunchedEffect
-        viewModel.addInitialLocation(position.latitude, position.longitude)
+        val measurement = locationState.lastLocation ?: return@LaunchedEffect
+        viewModel.addInitialLocation(measurement.toLocationFix())
         pendingSave = false
     }
 
     val detail = uiState.latestRecord?.let { record ->
         MapDetail(
             id = record.id,
-            title = record.bluetoothName ?: record.bluetoothAddress,
+            title = record.displayName,
+            device = record.bluetoothName ?: record.bluetoothAddress,
             latitude = record.latitude,
             longitude = record.longitude,
             timestamp = record.timestamp,

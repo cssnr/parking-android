@@ -5,12 +5,32 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.content.pm.PackageManager
 import android.location.Location
+import android.os.SystemClock
 import androidx.core.content.ContextCompat
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
 import kotlinx.coroutines.suspendCancellableCoroutine
+import org.maplibre.compose.location.LocationMeasurement
+import org.maplibre.spatialk.units.International.Meters
 import kotlin.coroutines.resume
+
+/**
+ * The subset of [Location] that ParKing persists.
+ *
+ * Optional fields are null rather than zero when the platform did not supply
+ * them, so a missing fix is never mistaken for a real measurement. [altitude] is
+ * meters above the WGS84 reference ellipsoid, not above mean sea level.
+ */
+data class LocationFix(
+    val latitude: Double,
+    val longitude: Double,
+    val fixTimestamp: Long,
+    val fixAgeMillis: Long?,
+    val accuracy: Float?,
+    val altitude: Double?,
+    val verticalAccuracy: Float?,
+)
 
 /**
  * Wraps FusedLocationProviderClient to expose the best available last-known location.
@@ -64,3 +84,48 @@ class LocationProvider(context: Context) {
                 ) == PackageManager.PERMISSION_GRANTED
     }
 }
+
+/**
+ * Reads a platform [Location] into a [LocationFix], guarding every optional
+ * accessor with its `has*()` check.
+ *
+ * The fix age is measured on the monotonic elapsed-realtime clock rather than
+ * derived from [Location.getTime], because wall clock time "can jump forwards or
+ * backwards unpredictably". A location that never had elapsed realtime stamped
+ * on it reports a null age instead of a nonsense one.
+ */
+fun Location.toLocationFix(): LocationFix = LocationFix(
+    latitude = latitude,
+    longitude = longitude,
+    fixTimestamp = time,
+    fixAgeMillis = if (elapsedRealtimeNanos > 0L) {
+        ((SystemClock.elapsedRealtimeNanos() - elapsedRealtimeNanos) / NANOS_PER_MILLI)
+            .coerceAtLeast(0L)
+    } else {
+        null
+    },
+    accuracy = if (hasAccuracy()) accuracy else null,
+    altitude = if (hasAltitude()) altitude else null,
+    verticalAccuracy = if (hasVerticalAccuracy()) verticalAccuracyMeters else null,
+)
+
+private const val NANOS_PER_MILLI = 1_000_000L
+
+/**
+ * Reads a MapLibre [LocationMeasurement] into a [LocationFix], so the manual save
+ * path records the same detail as the background path.
+ *
+ * [LocationMeasurement] deliberately drops the platform fix age once it has
+ * converted the fix, so [LocationFix.fixAgeMillis] is left null here rather than
+ * being guessed from the wall clock. The fix itself is live, so the true age is
+ * effectively zero.
+ */
+fun LocationMeasurement.toLocationFix(): LocationFix = LocationFix(
+    latitude = position.latitude,
+    longitude = position.longitude,
+    fixTimestamp = measuredAt.toEpochMilliseconds(),
+    fixAgeMillis = null,
+    accuracy = horizontalAccuracy?.toFloat(Meters),
+    altitude = position.altitude,
+    verticalAccuracy = altitudeAccuracy?.toFloat(Meters),
+)
