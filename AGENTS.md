@@ -21,6 +21,7 @@ ALWAYS use the `task *` commands
 
 | Command        | Purpose                                  |
 | -------------- | ---------------------------------------- |
+| `task test`    | Run JVM unit tests                       |
 | `task lint`    | Gradle Lint - DO NOT RUN                 |
 | `task compile` | Compile Kotlin - DO NOT truncate output  |
 | `task debug`   | Build debug variant (APK)                |
