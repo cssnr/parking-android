@@ -83,8 +83,7 @@ fun MapScreen(
         topBar = {
             TopAppBar(
                 title = {
-                    val record = detail
-                    if (record != null) {
+                    if (detail != null) {
                         Column {
                             Text(
                                 text = title,
@@ -93,7 +92,7 @@ fun MapScreen(
                                 overflow = TextOverflow.Ellipsis,
                             )
                             Text(
-                                text = formatSubtitle(record),
+                                text = formatSubtitle(detail),
                                 style = MaterialTheme.typography.titleSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 maxLines = 1,

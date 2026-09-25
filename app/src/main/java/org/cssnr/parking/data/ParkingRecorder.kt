@@ -29,19 +29,19 @@ class ParkingRecorder(
      * TODO: IDE says this function is never used
      */
     suspend fun recordDisconnect(address: String, name: String?): Boolean {
-        Log.d("ParkingRecorder", "recordDisconnect - address: $address name: $name")
+        Log.d(TAG, "recordDisconnect - address: $address name: $name")
         if (address.isBlank()) return false
         if (!automaticRepository.automaticEnabled.first()) return false
         if (!LocationProvider.hasLocationPermission(context)) return false
         Log.d(
-            "ParkingRecorder",
+            TAG,
             "selectedBluetoothDevices: ${automaticRepository.selectedBluetoothDevices}"
         )
         val selected = automaticRepository.selectedBluetoothDevices.first()
-        Log.d("ParkingRecorder", "selected: $selected")
+        Log.d(TAG, "selected: $selected")
         if (address !in selected) return false
         val location = locationProvider.getBestLocation() ?: return false
-        Log.d("ParkingRecorder", "location: $location")
+        Log.d(TAG, "location: $location")
         val fix = location.toLocationFix()
         val history = History(
             timestamp = Instant.now().toEpochMilli(),
@@ -54,7 +54,7 @@ class ParkingRecorder(
             altitude = fix.altitude,
             verticalAccuracy = fix.verticalAccuracy,
         )
-        Log.d("ParkingRecorder", "historyRepository.add - history: $history")
+        Log.d(TAG, "historyRepository.add - history: $history")
         val id = historyRepository.add(history)
         attachAddress(history.copy(id = id), fix)
         return true

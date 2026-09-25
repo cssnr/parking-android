@@ -11,9 +11,11 @@ import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
 import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.withTimeoutOrNull
 import org.maplibre.compose.location.LocationMeasurement
 import org.maplibre.spatialk.units.International.Meters
 import kotlin.coroutines.resume
+import kotlin.time.Duration.Companion.seconds
 
 /**
  * The subset of [Location] that ParKing persists.
@@ -42,10 +44,19 @@ class LocationProvider(context: Context) {
 
     /**
      * Returns the best available location: try a high-accuracy current fix first,
-     * then fall back to the most recent known locationaint.
+     * then fall back to the most recent known location.
+     *
+     * The current fix is bounded by [CURRENT_LOCATION_TIMEOUT] so that the fallback
+     * is actually reachable. Left unbounded, GMS sits on the request for roughly
+     * 30 seconds before returning null, so the fallback would only ever run when
+     * the request failed outright, and this runs inside a broadcast window that is
+     * shorter than that. Timing out here hands over to the last known fix, which
+     * is a few seconds stale at worst and is what [Location.getElapsedRealtimeNanos]
+     * plus the stored fix age are there to report.
      */
     suspend fun getBestLocation(): Location? {
-        getCurrentLocation()?.let { return it }
+        withTimeoutOrNull(CURRENT_LOCATION_TIMEOUT) { getCurrentLocation() }
+            ?.let { return it }
         return getLastLocation()
     }
 
@@ -72,6 +83,15 @@ class LocationProvider(context: Context) {
         }
 
     companion object {
+        /**
+         * How long to wait for a fresh fix before settling for the last known one.
+         *
+         * Generous, because a fresh fix is worth having and GMS usually returns
+         * one well inside this. It only matters when the device cannot produce a
+         * fix, where the fallback is a far better outcome than no record at all.
+         */
+        private val CURRENT_LOCATION_TIMEOUT = 10.seconds
+
         fun hasLocationPermission(context: Context): Boolean =
             ContextCompat.checkSelfPermission(
                 context,

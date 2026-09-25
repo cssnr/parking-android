@@ -38,8 +38,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -312,7 +312,6 @@ private fun FixDetail(
 }
 
 private fun formatAge(ageMillis: Long): String = when {
-    ageMillis < 1_000L -> "instant"
     ageMillis < 60_000L -> "${ageMillis / 1_000L}s old"
     ageMillis < 3_600_000L -> "${ageMillis / 60_000L}m old"
     ageMillis < 86_400_000L -> "${ageMillis / 3_600_000L}h old"

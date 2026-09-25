@@ -17,10 +17,10 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import org.cssnr.parking.data.toLocationFix
 import org.maplibre.compose.location.LocationPermission
 import org.maplibre.compose.location.rememberDefaultLocationProvider
 import org.maplibre.compose.location.rememberLocationState
-import org.cssnr.parking.data.toLocationFix
 import org.cssnr.parking.ui.AutomaticTrackingStatus
 import org.cssnr.parking.ui.navigation.MapDetail
 import org.cssnr.parking.ui.viewmodel.LocationViewModel

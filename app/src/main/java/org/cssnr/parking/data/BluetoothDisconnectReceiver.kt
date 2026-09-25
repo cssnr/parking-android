@@ -81,12 +81,13 @@ class BluetoothDisconnectReceiver : BroadcastReceiver() {
          * Total wall clock budget for the receiver, covering the location lookup and
          * the reverse geocode together.
          *
-         * goAsync keeps a broadcast alive for about 10 seconds before the system
-         * treats the receiver as non-responsive, so the whole pipeline is bounded
-         * below that. The per step timeouts inside are a convenience; this is the
-         * one that actually bounds the broadcast, and it is what turns a hung
-         * lookup into a dropped record instead of an ANR.
+         * goAsync keeps a background broadcast alive for about 30 seconds before the
+         * system treats the receiver as non-responsive, so this sits under that. In
+         * practice the budget does not bind: the location lookup settles within
+         * [org.cssnr.parking.data.LocationProvider] CURRENT_LOCATION_TIMEOUT, and the
+         * geocode is bounded on its own. It is the backstop that turns a genuinely
+         * hung call into a dropped record instead of an ANR.
          */
-        private val RECEIVER_BUDGET = 8.seconds
+        private val RECEIVER_BUDGET = 20.seconds
     }
 }
