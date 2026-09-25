@@ -7,7 +7,7 @@ import androidx.room3.RoomDatabase
 
 @Database(
     entities = [History::class],
-    version = 1,
+    version = 2,
     exportSchema = false,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -23,7 +23,7 @@ abstract class AppDatabase : RoomDatabase() {
                     context.applicationContext,
                     AppDatabase::class.java,
                     "parking.db",
-                ).build().also { instance = it }
+                ).addMigrations(Migrations.MIGRATION_1_2).build().also { instance = it }
             }
     }
 }

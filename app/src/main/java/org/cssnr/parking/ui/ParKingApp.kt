@@ -124,7 +124,8 @@ fun ParKingApp() {
                         navController.navigate(
                             MapDetail(
                                 id = record.id,
-                                title = record.bluetoothName ?: record.bluetoothAddress,
+                                title = record.displayName,
+                                device = record.bluetoothName ?: record.bluetoothAddress,
                                 latitude = record.latitude,
                                 longitude = record.longitude,
                                 timestamp = record.timestamp,

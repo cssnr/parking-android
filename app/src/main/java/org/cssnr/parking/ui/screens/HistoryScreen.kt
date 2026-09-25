@@ -3,6 +3,8 @@ package org.cssnr.parking.ui.screens
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -16,6 +18,9 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bluetooth
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Height
+import androidx.compose.material.icons.filled.MyLocation
+import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -33,6 +38,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -49,6 +55,7 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
 import java.util.Locale
+import kotlin.math.roundToInt
 
 @Composable
 fun HistoryRoute(
@@ -198,17 +205,11 @@ private fun HistoryRow(
                     text = record.bluetoothName ?: record.bluetoothAddress,
                     style = MaterialTheme.typography.titleMedium,
                 )
-                if (record.bluetoothAddress.isNotBlank()) {
-                    Text(
-                        text = record.bluetoothAddress,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
                 Text(
-                    text = formatLocation(record),
+                    text = record.displayName,
                     style = MaterialTheme.typography.bodyMedium,
                 )
+                FixDetails(record)
                 Text(
                     text = formatTimestamp(record.timestamp),
                     style = MaterialTheme.typography.bodySmall,
@@ -225,13 +226,97 @@ private fun HistoryRow(
     }
 }
 
-private fun formatLocation(record: History): String =
-    String.format(
-        Locale.US,
-        "%.5f, %.5f",
-        record.latitude,
-        record.longitude,
-    )
+/**
+ * The optional fix quality row: horizontal accuracy, altitude with its own
+ * vertical accuracy, and how stale the fix was when it was recorded.
+ *
+ * Each value is an icon plus a label rather than a pipe delimited sentence,
+ * because these are unrelated quantities and a reader scanning the list should
+ * be able to pick one out without parsing the ones next to it.
+ *
+ * Laid out as a [FlowRow] so a wide accuracy value, a large font scale, or a long
+ * age all wrap to the next line instead of running off the edge of the card.
+ *
+ * Altitude is height above the WGS84 reference ellipsoid, not above mean sea
+ * level; the vertical accuracy beside it is what says whether it is worth
+ * trusting. None of these were captured before schema version 2, so a record
+ * saved by an older build renders nothing here.
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun FixDetails(record: History) {
+    val accuracy = record.accuracy
+    val altitude = record.altitude
+    val fixAge = record.fixAgeMillis
+    if (accuracy == null && altitude == null && fixAge == null) return
+
+    FlowRow(
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(2.dp),
+        itemVerticalAlignment = Alignment.CenterVertically,
+    ) {
+        accuracy?.let {
+            FixDetail(
+                icon = Icons.Filled.MyLocation,
+                label = String.format(Locale.US, "%dm", it.roundToInt()),
+                description = "Horizontal accuracy",
+            )
+        }
+        altitude?.let {
+            val label = listOfNotNull(
+                String.format(Locale.US, "%.0fm", it),
+                record.verticalAccuracy?.let { accuracyMeters ->
+                    String.format(Locale.US, "+/-%dm", accuracyMeters.roundToInt())
+                },
+            ).joinToString(" ")
+            FixDetail(
+                icon = Icons.Filled.Height,
+                label = label,
+                description = "Altitude above the WGS84 ellipsoid",
+            )
+        }
+        fixAge?.let {
+            FixDetail(
+                icon = Icons.Filled.Schedule,
+                label = formatAge(it),
+                description = "Age of the location fix when it was saved",
+            )
+        }
+    }
+}
+
+@Composable
+private fun FixDetail(
+    icon: ImageVector,
+    label: String,
+    description: String,
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Icon(
+            imageVector = icon,
+            // The value is already in the adjacent text, so the icon itself is
+            // decorative; the description keeps it announced correctly.
+            contentDescription = description,
+            modifier = Modifier.size(14.dp),
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+private fun formatAge(ageMillis: Long): String = when {
+    ageMillis < 60_000L -> "${ageMillis / 1_000L}s old"
+    ageMillis < 3_600_000L -> "${ageMillis / 60_000L}m old"
+    ageMillis < 86_400_000L -> "${ageMillis / 3_600_000L}h old"
+    else -> "${ageMillis / 86_400_000L}d old"
+}
 
 private fun formatTimestamp(timestamp: Long): String =
     DateTimeFormatter

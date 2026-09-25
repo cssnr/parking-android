@@ -17,6 +17,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import org.maplibre.compose.camera.CameraPosition
 import org.maplibre.compose.expressions.dsl.const
@@ -82,28 +83,28 @@ fun MapScreen(
         topBar = {
             TopAppBar(
                 title = {
-                    val timestamp = detail?.let { formatTimestamp(it.timestamp) }
-                    if (timestamp != null) {
+                    if (detail != null) {
                         Column {
                             Text(
-                                text = timestamp,
+                                text = title,
                                 style = MaterialTheme.typography.titleLarge,
                                 maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
                             )
-                            if (title.isNotBlank()) {
-                                Text(
-                                    text = title,
-                                    style = MaterialTheme.typography.titleSmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    maxLines = 1,
-                                )
-                            }
+                            Text(
+                                text = formatSubtitle(detail),
+                                style = MaterialTheme.typography.titleSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
                         }
                     } else {
                         Text(
                             text = title,
                             style = MaterialTheme.typography.titleLarge,
                             maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
                         )
                     }
                 },
@@ -187,6 +188,15 @@ fun MapScreen(
 
 private fun pointFeatureJson(position: Position): String =
     """{"type":"FeatureCollection","features":[{"type":"Feature","properties":{},"geometry":{"type":"Point","coordinates":[${position.longitude},${position.latitude}]}}]}"""
+
+/**
+ * The second title bar line: when the record was saved, then the device that
+ * triggered it. [MapDetail.device] falls back to the bluetooth address and manual
+ * saves are labelled "Manually Parked", so it is never empty and there is no
+ * dangling separator case to handle.
+ */
+private fun formatSubtitle(detail: MapDetail): String =
+    "${formatTimestamp(detail.timestamp)} - ${detail.device}"
 
 private fun formatTimestamp(timestamp: Long): String =
     DateTimeFormatter

@@ -21,6 +21,10 @@ tasks:
     cmds:
       - prettier --write .
 
+  test:
+    desc: Run JVM unit tests
+    cmd: "{{.GRADLEW}} :app:testDebugUnitTest {{.CLI_ARGS}}"
+
   lint:
     desc: Gradle Lint
     cmd: "{{.GRADLEW}} lint {{.CLI_ARGS}}"

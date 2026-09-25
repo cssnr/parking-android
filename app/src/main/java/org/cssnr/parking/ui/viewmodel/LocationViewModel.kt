@@ -8,10 +8,14 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import org.cssnr.parking.data.HistoryRepository
+import org.cssnr.parking.data.LocationFix
 import org.cssnr.parking.data.LocationRepository
+import org.cssnr.parking.data.ReverseGeocoder
 import org.cssnr.parking.data.db.AppDatabase
 import org.cssnr.parking.data.db.History
+import kotlin.time.Duration.Companion.seconds
 
 data class LocationUiState(
     val historyLoaded: Boolean = false,
@@ -30,6 +34,7 @@ class LocationViewModel(application: Application) : AndroidViewModel(application
 
     private val historyRepository = HistoryRepository(AppDatabase.getDatabase(application))
     private val locationRepository = LocationRepository(application)
+    private val reverseGeocoder = ReverseGeocoder(application)
 
     val locationUiState: StateFlow<LocationUiState> =
         combine(
@@ -54,18 +59,43 @@ class LocationViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
-    fun addInitialLocation(latitude: Double, longitude: Double) {
+    /**
+     * Records the current position as the parking spot.
+     *
+     * The row is written before the reverse geocode runs, for the same reason
+     * [org.cssnr.parking.data.ParkingRecorder] does it in that order: a
+     * geocoding failure must not lose the position.
+     */
+    fun addInitialLocation(fix: LocationFix) {
         viewModelScope.launch {
-            historyRepository.add(
-                History(
-                    timestamp = System.currentTimeMillis(),
-                    latitude = latitude,
-                    longitude = longitude,
-                    bluetoothAddress = "",
-                    bluetoothName = "Manually Parked",
-                )
+            val record = History(
+                timestamp = System.currentTimeMillis(),
+                latitude = fix.latitude,
+                longitude = fix.longitude,
+                bluetoothAddress = "",
+                bluetoothName = "Manually Parked",
+                fixAgeMillis = fix.fixAgeMillis,
+                accuracy = fix.accuracy,
+                altitude = fix.altitude,
+                verticalAccuracy = fix.verticalAccuracy,
             )
+            val id = historyRepository.add(record)
+            // Dismissed before the geocode, not after: the record already exists, so
+            // the prompt's precondition is met, and there is no reason to make the
+            // user wait on a network lookup for UI state that is already settled.
             locationRepository.dismissInitialLocationPrompt()
+            val address = withTimeoutOrNull(GEOCODE_TIMEOUT) {
+                runCatching { reverseGeocoder.reverseGeocode(fix.latitude, fix.longitude) }
+                    .getOrNull()
+            }
+            // Left unset on failure so the backfill retries this record later.
+            if (address != null) {
+                historyRepository.update(record.copy(id = id, address = address, geocoded = true))
+            }
         }
+    }
+
+    companion object {
+        private val GEOCODE_TIMEOUT = 5.seconds
     }
 }
