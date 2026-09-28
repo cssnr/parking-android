@@ -64,6 +64,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import org.cssnr.parking.data.LocationProvider
+import org.cssnr.parking.data.ParkingWatchService
 import org.cssnr.parking.ui.AutomaticTrackingHeader
 import org.cssnr.parking.ui.AutomaticTrackingStatus
 import org.cssnr.parking.ui.theme.ParKingTheme
@@ -233,6 +234,10 @@ fun AutomaticRoute(
             } else {
                 pendingBackgroundRequest = false
                 autoEnablePending = false
+                // Stops an event that is still being recorded. Without this the
+                // service and its location request would keep running, and its
+                // notification stay on screen, until the fix timed out.
+                ParkingWatchService.stop(context)
                 viewModel.setAutomaticEnabled(false)
             }
         },

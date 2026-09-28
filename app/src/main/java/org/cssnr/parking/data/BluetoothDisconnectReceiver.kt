@@ -9,23 +9,32 @@ import android.util.Log
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeout
-import org.cssnr.parking.data.db.AppDatabase
 import kotlin.time.Duration.Companion.seconds
 
 /**
  * Manifest-registered receiver for [BluetoothDevice.ACTION_ACL_DISCONNECTED].
  *
- * Converts the short broadcast lifetime into a goAsync + coroutine window so the
- * suspended [ParkingRecorder] pipeline can run off the main thread.
+ * The disconnect is only used to hand the event to [ParkingWatchService], which is
+ * the only place a fresh fix can be obtained: in the background "the location
+ * system service computes a new location for your app only a few times each hour".
+ * The broadcast itself is not in the foreground and is only allowed to run for
+ * about 30 seconds, neither of which suits a real cold-start fix.
+ *
+ * The connect is deliberately not handled. The fix is only needed once the car has
+ * stopped, so the service is started here and stops as soon as the event is
+ * written, rather than holding a foreground notification for the whole drive.
+ *
+ * Filtering reads DataStore, so the broadcast's short lifetime is turned into a
+ * goAsync window, bounded by [RECEIVER_BUDGET] so a hung call costs one event
+ * rather than an ANR.
  */
 class BluetoothDisconnectReceiver : BroadcastReceiver() {
 
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action != BluetoothDevice.ACTION_ACL_DISCONNECTED) return
-        Log.d(TAG, "new intent - ACTION_ACL_DISCONNECTED")
 
         val device: BluetoothDevice? =
             if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
@@ -34,36 +43,47 @@ class BluetoothDisconnectReceiver : BroadcastReceiver() {
                 @Suppress("DEPRECATION")
                 intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE)
             }
-        Log.d(TAG, "device: $device")
-        val address: String = device?.address ?: return
-        Log.d(TAG, "address: $address")
-        val name: String? = device.let(::safeDeviceName)
-        Log.d(TAG, "name: $name")
+        // BLUETOOTH_CONNECT may not be granted even when the broadcast arrives, and
+        // address is readable without it, so neither read is allowed to throw.
+        val address: String = device?.let { runCatching { it.address }.getOrNull() }.orEmpty()
+        val name: String? = device?.let(::safeDeviceName)
+        Log.d(TAG, "${intent.action} device: $address name: $name")
 
-        if (address.isBlank()) return
+        if (address.isBlank()) {
+            Log.w(TAG, "no address on ${intent.action}, ignoring")
+            return
+        }
 
         val pendingResult = goAsync()
-        val receiverScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
-        receiverScope.launch {
+        val applicationContext = context.applicationContext
+        CoroutineScope(SupervisorJob() + Dispatchers.Default).launch {
             try {
                 withTimeout(RECEIVER_BUDGET) {
-                    val recorder = ParkingRecorder(
-                        AutomaticRepository(context.applicationContext),
-                        HistoryRepository(AppDatabase.getDatabase(context)),
-                        LocationProvider(context.applicationContext),
-                        ReverseGeocoder(context.applicationContext),
-                        context.applicationContext,
-                    )
-                    recorder.recordDisconnect(address, name)
+                    if (!isSelected(applicationContext, address)) {
+                        Log.d(TAG, "$address is not a selected device, ignoring ${intent.action}")
+                        return@withTimeout
+                    }
+                    if (!ParkingWatchService.start(applicationContext, address, name)) {
+                        Log.w(TAG, "no service, so no fresh fix, dropping $address")
+                    }
                 }
-            } catch (_: TimeoutCancellationException) {
-                Log.w(TAG, "gave up after $RECEIVER_BUDGET, record not saved")
             } catch (e: Exception) {
-                e.printStackTrace()
+                Log.e(TAG, "could not handle ${intent.action} for $address: ${e.message}", e)
             } finally {
                 pendingResult.finish()
             }
         }
+    }
+
+    /**
+     * Whether ParKing is tracking this device. The rest of the filtering, including
+     * the location permission check, is left to [ParkingRecorder] so the rule lives
+     * in one place rather than two.
+     */
+    private suspend fun isSelected(context: Context, address: String): Boolean {
+        val automatic = AutomaticRepository(context)
+        if (!automatic.automaticEnabled.first()) return false
+        return address in automatic.selectedBluetoothDevices.first()
     }
 
     /**
@@ -78,16 +98,14 @@ class BluetoothDisconnectReceiver : BroadcastReceiver() {
         private const val TAG = "BTReceiver"
 
         /**
-         * Total wall clock budget for the receiver, covering the location lookup and
-         * the reverse geocode together.
+         * Total wall clock budget for the receiver, covering the preference reads
+         * and the service start.
          *
          * goAsync keeps a background broadcast alive for about 30 seconds before the
-         * system treats the receiver as non-responsive, so this sits under that. In
-         * practice the budget does not bind: the location lookup settles within
-         * [org.cssnr.parking.data.LocationProvider] CURRENT_LOCATION_TIMEOUT, and the
-         * geocode is bounded on its own. It is the backstop that turns a genuinely
-         * hung call into a dropped record instead of an ANR.
+         * system treats the receiver as non-responsive, so this sits well under that.
+         * Nothing on this path should take anything like this long; the budget turns
+         * a genuinely hung call into one dropped event instead of an ANR.
          */
-        private val RECEIVER_BUDGET = 20.seconds
+        private val RECEIVER_BUDGET = 10.seconds
     }
 }

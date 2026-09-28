@@ -6,4 +6,11 @@
     <!-- ACRA Disable Dialog -->
     <string name="acra_disable_message">Reports are only sent when the app crashes. This helps fix bugs and no personal data is sent.</string>
     <string name="acra_info_link">https://github.com/cssnr/parking-android#crash-reporting</string>
+
+    <!-- Channel for the ongoing notification Android requires while a foreground
+         service reads a location. Silent, and not a real alert. -->
+    <string name="service_channel_name">Parking tracking</string>
+    <string name="service_channel_description">Shown for the few seconds it takes to read a location when your device disconnects.</string>
+    <!-- Foreground service notification -->
+    <string name="notification_watching">Finding where you parked…</string>
 </resources>

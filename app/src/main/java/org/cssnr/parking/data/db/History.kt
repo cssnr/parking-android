@@ -67,8 +67,9 @@ data class History(
     val bluetoothName: String? = null,
 
     // Location fix metadata. All nullable: the platform guarantees only latitude,
-    // longitude, timestamp and accuracy on provider generated locations, and
-    // LocationProvider.getBestLocation can fall back to a lastLocation of unknown age.
+    // longitude, timestamp and accuracy on provider generated locations, and a fix
+    // is only recorded at all once it has passed LocationProvider's age check, which
+    // is itself driven by [fixAgeMillis] being present.
     // [fixAgeMillis] is how stale the fix was at the moment it was recorded.
     val fixAgeMillis: Long? = null,
     val accuracy: Float? = null,

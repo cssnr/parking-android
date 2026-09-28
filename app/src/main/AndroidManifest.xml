@@ -39,7 +39,9 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.ParKing">
 
-        <!-- Records parking spot when a selected Bluetooth device disconnects -->
+        <!-- Records parking spot when a selected Bluetooth device disconnects. The
+             connect is deliberately not handled: the service below is started here
+             so its notification only exists for the seconds it takes to read a fix. -->
         <receiver
             android:name=".data.BluetoothDisconnectReceiver"
             android:exported="true">
@@ -48,6 +50,16 @@
                 <action android:name="android.bluetooth.device.action.ACL_DISCONNECTED" />
             </intent-filter>
         </receiver>
+
+        <!-- Puts the app in the foreground for the few seconds it takes to read a
+             fresh fix. A background app is only offered a new location "a few times
+             each hour", which is what stopped a parking spot from ever being
+             recorded. It is started from the background by the broadcast above, so
+             ACCESS_BACKGROUND_LOCATION has to stay granted. -->
+        <service
+            android:name=".data.ParkingWatchService"
+            android:exported="false"
+            android:foregroundServiceType="location" />
 
         <activity
             android:name=".MainActivity"

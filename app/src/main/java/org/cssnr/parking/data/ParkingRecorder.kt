@@ -26,6 +26,11 @@ class ParkingRecorder(
     /**
      * Attempts to record a parking event for the given Bluetooth device address.
      * Returns true if a history record was added.
+     *
+     * No fix means no record. The alternative is writing the position the provider
+     * was already holding, which is the stale value this pipeline exists to avoid,
+     * so a missing fix drops the event rather than misplacing it.
+     *
      * TODO: IDE says this function is never used
      */
     suspend fun recordDisconnect(address: String, name: String?): Boolean {
@@ -40,9 +45,11 @@ class ParkingRecorder(
         val selected = automaticRepository.selectedBluetoothDevices.first()
         Log.d(TAG, "selected: $selected")
         if (address !in selected) return false
-        val location = locationProvider.getBestLocation() ?: return false
-        Log.d(TAG, "location: $location")
-        val fix = location.toLocationFix()
+        val fix = locationProvider.getBestFix() ?: run {
+            Log.w(TAG, "no fresh fix for $address, no record written")
+            return false
+        }
+        Log.d(TAG, "fix: $fix")
         val history = History(
             timestamp = Instant.now().toEpochMilli(),
             latitude = fix.latitude,
