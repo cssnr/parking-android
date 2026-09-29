@@ -4,6 +4,11 @@ ParKing Android app using Jetpack Compose, Material 3 and Room 3.
 
 To detect when the user leaves their car (disconnects from a bluetooth device) and log their GPS location.
 
+1. User enters/starts car and bluetooth connects automatically
+2. User arrives at location and stops car, bluetooth disconnects
+3. This is the exact time and location when the car was parked!
+4. App gets the exact GPS location and records it to the database
+
 - `app/` - Android app source
 - `gradle/libs.versions.toml` - Library versions
 - `Taskfile.yml` - [task](https://github.com/go-task/task) commands
