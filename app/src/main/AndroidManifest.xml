@@ -40,9 +40,10 @@
         android:theme="@style/Theme.ParKing">
 
         <!-- Records parking spot when a selected Bluetooth device disconnects. The
-             connect is deliberately not handled: the service below is started here
-             and stopped as soon as the event is written, so its notification is
-             only on screen for the moment the fix takes. -->
+             event itself is written here, inside the broadcast window. The service
+             below is started only to attach a position to that row, and stops as
+             soon as the fix lands or is refused, so its notification is on screen
+             for the moment the fix takes. -->
         <receiver
             android:name=".data.BluetoothDisconnectReceiver"
             android:exported="true">

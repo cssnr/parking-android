@@ -20,8 +20,12 @@ import org.cssnr.parking.data.db.AppDatabase
 import kotlin.time.Duration.Companion.seconds
 
 /**
- * Runs in the foreground just long enough to record one parking event, so ParKing
- * can ask for a location at the moment the car disconnects.
+ * Runs in the foreground just long enough to attach a position to one parking
+ * event, so ParKing can ask for a location at the moment the car disconnects.
+ *
+ * It does not record the event. [BluetoothDisconnectReceiver] has already written
+ * the row by the time this starts, which is what makes the event safe regardless of
+ * what happens in here. This service owns nothing but the coordinates.
  *
  * Why a service at all: Android states that "if your app is running in the
  * background, the location system service computes a new location for your app
@@ -49,57 +53,25 @@ class ParkingWatchService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         // Before anything else: the system kills a service that does not promote
         // itself to the foreground within a few seconds of being started this way.
-        if (!promoteToForeground()) {
-            // Without foreground status there is no fresh fix to be had, but the
-            // disconnect is still real and still not reproducible. Record it without
-            // coordinates rather than dropping it; the position can be filled in
-            // later from the foreground.
-            Log.e(
-                TAG,
-                "could not enter the foreground, recording " +
-                    "${intent?.getStringExtra(EXTRA_ADDRESS)} without a position",
-            )
-            if (intent?.action == ACTION_DEVICE_DISCONNECTED) {
-                recordWithoutPosition(intent)
-            }
+        val recordId = intent?.getLongExtra(EXTRA_RECORD_ID, NO_RECORD_ID) ?: NO_RECORD_ID
+        if (intent?.action != ACTION_ATTACH_POSITION || recordId == NO_RECORD_ID) {
+            Log.w(TAG, "nothing to place on ${intent?.action}, shutting down")
             stopSelf()
             return START_NOT_STICKY
         }
 
-        when (intent?.action) {
-            ACTION_DEVICE_DISCONNECTED -> onDeviceDisconnected(intent)
-            else -> {
-                Log.w(TAG, "no action on ${intent?.action}, shutting down")
-                shutdown()
-            }
+        if (!promoteToForeground()) {
+            // Without foreground status there is no fresh fix to be had. The event
+            // is already written and safe; all that is lost is the position, and it
+            // is never resolved after the fact because a later fix would be the
+            // user's current position rather than the car's.
+            Log.e(TAG, "could not enter the foreground, record $recordId keeps no position")
+            stopSelf()
+            return START_NOT_STICKY
         }
-        return START_NOT_STICKY
-    }
 
-    /**
-     * Records the event with no position, for when the foreground status this
-     * service exists to provide could not be had.
-     *
-     * This is the one path that cannot use the normal pipeline, because that
-     * pipeline's reason for existing is the fix. So it writes the same record the
-     * normal path writes, minus the location, and lets the foreground retry in
-     * HistoryViewModel place it later.
-     */
-    private fun recordWithoutPosition(intent: Intent) {
-        val address = intent.getStringExtra(EXTRA_ADDRESS).orEmpty()
-        val name = intent.getStringExtra(EXTRA_NAME)
-        scope.launch {
-            try {
-                ParkingRecorder(
-                    AutomaticRepository(applicationContext),
-                    HistoryRepository(AppDatabase.getDatabase(applicationContext)),
-                    ReverseGeocoder(applicationContext),
-                    applicationContext,
-                ).recordDisconnect(address, name)
-            } catch (e: Exception) {
-                Log.e(TAG, "could not record $address: ${e.message}", e)
-            }
-        }
+        attachPosition(recordId)
+        return START_NOT_STICKY
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -111,12 +83,12 @@ class ParkingWatchService : Service() {
     }
 
     /**
-     * Records the event, then tries to place it, then stops.
+     * Attaches a position to an event the receiver has already written, then stops.
      *
-     * The record is written first so it exists whatever happens to the location
-     * request. A disconnect is the one thing the user cannot recreate; a position is
-     * a best effort that the platform is free to refuse. A failure here costs the
-     * coordinates and nothing else.
+     * The event is already in the database by the time this runs, so this service
+     * owns nothing but the coordinates. Every failure mode here costs exactly the
+     * position: the record still exists, still shows when the car was parked, and
+     * simply carries no pin.
      *
      * The work runs here rather than in the broadcast because a background
      * `BroadcastReceiver` is only allowed to run for "30 seconds or even a bit
@@ -131,34 +103,36 @@ class ParkingWatchService : Service() {
      * derives a fix instead. `setMaxUpdateAgeMillis(0)` did not prevent the stale
      * value in the background.
      */
-    private fun onDeviceDisconnected(intent: Intent) {
-        val address = intent.getStringExtra(EXTRA_ADDRESS).orEmpty()
-        val name = intent.getStringExtra(EXTRA_NAME)
-        Log.d(TAG, "device disconnected: $address $name")
+    private fun attachPosition(recordId: Long) {
+        Log.d(TAG, "attaching a position to record $recordId")
 
         scope.launch {
             try {
                 withTimeout(RECORD_BUDGET) {
-                    val recorder = ParkingRecorder(
-                        AutomaticRepository(applicationContext),
-                        HistoryRepository(AppDatabase.getDatabase(applicationContext)),
-                        ReverseGeocoder(applicationContext),
-                        applicationContext,
+                    val historyRepository = HistoryRepository(
+                        AppDatabase.getDatabase(applicationContext),
                     )
-                    val record = recorder.recordDisconnect(address, name)
+                    val record = historyRepository.getById(recordId)
                     if (record == null) {
-                        Log.d(TAG, "$address is not a selected device, ignoring")
+                        Log.d(TAG, "record $recordId is gone, nothing to place")
                         return@withTimeout
                     }
                     val fix = locationProvider.getBestFix(FIX_BUDGET)
                     if (fix == null) {
-                        Log.w(TAG, "record ${record.id} has no position yet, it stays unresolved")
+                        // Not retried anywhere. A fix obtained after the fact would
+                        // be where the user is standing now, not where the car is.
+                        Log.w(TAG, "no fix, record $recordId keeps no position")
                     } else {
-                        recorder.attachFix(record, fix)
+                        ParkingRecorder(
+                            AutomaticRepository(applicationContext),
+                            historyRepository,
+                            ReverseGeocoder(applicationContext),
+                            applicationContext,
+                        ).attachFix(record, fix)
                     }
                 }
             } catch (e: Exception) {
-                Log.e(TAG, "failed to record the event: ${e.message}", e)
+                Log.e(TAG, "failed to place record $recordId: ${e.message}", e)
             } finally {
                 shutdown()
             }
@@ -179,6 +153,10 @@ class ParkingWatchService : Service() {
      * `ForegroundServiceStartNotAllowedException`. Left uncaught, the first kills
      * the process mid-disconnect and the second leaves the service unable to
      * promote, so the caller has to be able to tell that neither worked.
+     *
+     * A refusal is not worth fighting. The event is already recorded by the time
+     * this runs, so the only thing lost is the position, and the service shuts down
+     * immediately rather than lingering without foreground status it will never get.
      *
      * [ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION] arrived in API 29, below this
      * app's minimum, but it is a compile-time constant the compiler inlines by
@@ -201,13 +179,15 @@ class ParkingWatchService : Service() {
     companion object {
         private const val TAG = "ParkingWatchService"
 
-        const val ACTION_DEVICE_DISCONNECTED = "org.cssnr.parking.DEVICE_DISCONNECTED"
+        const val ACTION_ATTACH_POSITION = "org.cssnr.parking.ATTACH_POSITION"
 
-        const val EXTRA_ADDRESS = "org.cssnr.parking.extra.ADDRESS"
-        const val EXTRA_NAME = "org.cssnr.parking.extra.NAME"
+        const val EXTRA_RECORD_ID = "org.cssnr.parking.extra.RECORD_ID"
+
+        /** Sentinel for an intent that carries no record to place. */
+        private const val NO_RECORD_ID = -1L
 
         /**
-         * Total wall clock budget for recording one event.
+         * Total wall clock budget for placing one event.
          *
          * Generous, because it is dominated by the fresh fix request and the
          * service has no broadcast deadline to respect. It exists only so that a
@@ -226,17 +206,16 @@ class ParkingWatchService : Service() {
         private val FIX_BUDGET = 25.seconds
 
         /**
-         * Hands a disconnect to the service, starting it.
+         * Asks the service to place an already-recorded event, starting it.
          *
-         * Returns whether the service was started. A false return means the
-         * platform refused a background foreground service start, which leaves no
-         * way to get a fresh fix, so the caller drops the event.
+         * Returns whether the service was started. A false return means the platform
+         * refused a background foreground service start, which leaves no way to get a
+         * fresh fix, so the record keeps the position it has, which is none.
          */
-        fun start(context: Context, address: String, name: String?): Boolean {
+        fun start(context: Context, recordId: Long): Boolean {
             val intent = Intent(context, ParkingWatchService::class.java)
-                .setAction(ACTION_DEVICE_DISCONNECTED)
-                .putExtra(EXTRA_ADDRESS, address)
-                .putExtra(EXTRA_NAME, name)
+                .setAction(ACTION_ATTACH_POSITION)
+                .putExtra(EXTRA_RECORD_ID, recordId)
             return try {
                 ContextCompat.startForegroundService(context, intent)
                 true
@@ -245,9 +224,9 @@ class ParkingWatchService : Service() {
                 // not allow the disconnect broadcast to start a foreground service.
                 Log.e(
                     TAG,
-                    "could not start the service for $address. Without foreground " +
-                        "status Android will not offer a new location, so the event " +
-                        "is dropped. Cause: ${e.message}",
+                    "could not start the service for record $recordId. Without " +
+                        "foreground status Android will not offer a new location, so " +
+                        "the record keeps no position. Cause: ${e.message}",
                     e,
                 )
                 false

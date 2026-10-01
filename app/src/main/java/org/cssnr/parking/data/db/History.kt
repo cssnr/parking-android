@@ -111,15 +111,17 @@ data class History(
 
     /**
      * Best available label for this record: the reverse geocoded address when the
-     * geocoder produced one, otherwise the raw coordinates, otherwise a placeholder
-     * because the location request came back empty. Never blank, so it is safe to
-     * use directly as a title.
+     * geocoder produced one, otherwise the raw coordinates.
+     *
+     * Null when the record has no position, because there is nothing to label and
+     * this class holds no resources to name the gap in the user's language. Callers
+     * that can be handed a positionless record supply their own text.
      */
-    val displayName: String
+    val displayName: String?
         get() = address.displayLabel
             ?: if (hasFix) {
                 String.format(Locale.US, "%.5f, %.5f", latitude, longitude)
             } else {
-                "Location not recorded"
+                null
             }
 }

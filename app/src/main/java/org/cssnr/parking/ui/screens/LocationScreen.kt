@@ -77,15 +77,16 @@ fun LocationRoute(
     val detail = uiState.latestRecord?.let { record ->
         val latitude = record.latitude
         val longitude = record.longitude
+        val title = record.displayName
         // Only a located record can be shown on the map. A disconnect recorded
         // without a position is skipped here, the same way the History screen will
         // not navigate to one.
-        if (latitude == null || longitude == null) {
+        if (latitude == null || longitude == null || title == null) {
             null
         } else {
             MapDetail(
                 id = record.id,
-                title = record.displayName,
+                title = title,
                 device = record.bluetoothName ?: record.bluetoothAddress,
                 latitude = latitude,
                 longitude = longitude,

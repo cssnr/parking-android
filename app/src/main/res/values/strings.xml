@@ -13,4 +13,7 @@
     <string name="service_channel_description">Shown for the few seconds it takes to read a location when your device disconnects.</string>
     <!-- Foreground service notification -->
     <string name="notification_watching">Finding where you parked…</string>
+
+    <!-- Shown instead of an address when the location request came back empty -->
+    <string name="location_not_recorded">Location not recorded</string>
 </resources>
