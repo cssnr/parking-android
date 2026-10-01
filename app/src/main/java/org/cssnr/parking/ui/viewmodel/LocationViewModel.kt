@@ -88,9 +88,10 @@ class LocationViewModel(application: Application) : AndroidViewModel(application
                 runCatching { reverseGeocoder.reverseGeocode(fix.latitude, fix.longitude) }
                     .getOrNull()
             }
-            // Left unset on failure so the backfill retries this record later.
+            // A failed lookup is not retried: the record keeps its coordinates and
+            // displays those instead of an address.
             if (address != null) {
-                historyRepository.update(record.copy(id = id, address = address, geocoded = true))
+                historyRepository.update(record.copy(id = id, address = address))
             }
         }
     }

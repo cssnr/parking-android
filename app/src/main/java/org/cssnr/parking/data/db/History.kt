@@ -61,14 +61,21 @@ data class History(
     @PrimaryKey(autoGenerate = true)
     val id: Long = 0,
     val timestamp: Long,
-    val latitude: Double,
-    val longitude: Double,
+
+    // Null until a position is attached. The disconnect is recorded the instant it
+    // fires so the event can never be lost, and the coordinates are filled in
+    // separately; asking for a location is throttled for a background app and
+    // sometimes produces nothing, which must not cost the record itself.
+    val latitude: Double?,
+    val longitude: Double?,
+
     val bluetoothAddress: String,
     val bluetoothName: String? = null,
 
     // Location fix metadata. All nullable: the platform guarantees only latitude,
-    // longitude, timestamp and accuracy on provider generated locations, and
-    // LocationProvider.getBestLocation can fall back to a lastLocation of unknown age.
+    // longitude, timestamp and accuracy on provider generated locations, and a fix
+    // of unknown age is rejected by LocationProvider.isFreshEnough before it gets
+    // this far.
     // [fixAgeMillis] is how stale the fix was at the moment it was recorded.
     val fixAgeMillis: Long? = null,
     val accuracy: Float? = null,
@@ -81,22 +88,30 @@ data class History(
 
     @Embedded(prefix = "addr_")
     val address: LocationAddress = LocationAddress(),
-
-    // Set once a reverse geocode has succeeded, and that is the only thing the
-    // backfill keys off, so it must be set even when the provider returns an
-    // address with a null [LocationAddress.line]. Keying off the address columns
-    // instead would re-look-up those records on every launch forever.
-    //
-    // A lookup that returns nothing leaves this null so the record is retried. Kept
-    // nullable so MIGRATION_1_2 can add the column without a DEFAULT clause.
-    val geocoded: Boolean? = null,
 ) {
     /**
-     * Best available label for this record: the reverse geocoded address when the
-     * geocoder produced one, otherwise the raw coordinates. Never blank, so it is
-     * safe to use directly as a title.
+     * Whether this record has a position yet.
+     *
+     * False for a disconnect whose location request produced nothing. The record
+     * is still a real parking event, so it is still listed and still deletable;
+     * there is just nothing to centre a map on.
      */
-    val displayName: String
+    val hasFix: Boolean
+        get() = latitude != null && longitude != null
+
+    /**
+     * Best available label for this record: the reverse geocoded address when the
+     * geocoder produced one, otherwise the raw coordinates.
+     *
+     * Null when the record has no position, because there is nothing to label and
+     * this class holds no resources to name the gap in the user's language. Callers
+     * that can be handed a positionless record supply their own text.
+     */
+    val displayName: String?
         get() = address.displayLabel
-            ?: String.format(Locale.US, "%.5f, %.5f", latitude, longitude)
+            ?: if (hasFix) {
+                String.format(Locale.US, "%.5f, %.5f", latitude, longitude)
+            } else {
+                null
+            }
 }

@@ -40,6 +40,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -171,7 +172,10 @@ private fun HistoryRow(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick),
+            // A record with no position has nothing to show on a map, so it is not
+            // a target. It is still listed and still deletable, because the
+            // disconnect itself is a real event worth keeping.
+            .clickable(enabled = record.hasFix) { onClick() },
     ) {
         Row(
             modifier = Modifier
@@ -206,7 +210,7 @@ private fun HistoryRow(
                     style = MaterialTheme.typography.titleMedium,
                 )
                 Text(
-                    text = record.displayName,
+                    text = record.displayName ?: stringResource(R.string.location_not_recorded),
                     style = MaterialTheme.typography.bodyMedium,
                 )
                 FixDetails(record)
