@@ -50,17 +50,12 @@ class LocationProvider(context: Context) {
      * The fix to record for the parking spot, or null if nothing usable arrived
      * within [budget].
      *
-     * `lastLocation` is deliberately not consulted. It is cached per app, and
-     * ParKing asks for nothing while the car is being driven, so its value is
-     * whatever the platform last computed for ParKing specifically, which is
-     * typically wherever the phone was before the trip. That is the stale location
-     * this pipeline exists to avoid.
+     * A null return is a normal outcome, not a failure. The caller records the
+     * event regardless and simply has no position for it.
      *
-     * A null return is a normal outcome, not a failure. ParKing is a background app
-     * at this point and "the location system service computes a new location for
-     * your app only a few times each hour", so the request is throttled and is
-     * allowed to come back with nothing. The caller records the event regardless and
-     * simply has no position for it yet.
+     * `lastLocation` is deliberately not consulted: it is cached per app, and
+     * ParKing asks for nothing during the drive, so it points at wherever the phone
+     * was before the trip. That is the stale location this exists to avoid.
      */
     suspend fun getBestFix(budget: Duration): LocationFix? {
         val started = SystemClock.elapsedRealtime()
@@ -87,16 +82,13 @@ class LocationProvider(context: Context) {
     /**
      * One-shot request for the current location.
      *
-     * [CurrentLocationRequest] rather than a streaming
-     * [com.google.android.gms.location.LocationRequest] because this is a single
-     * fix, not a stream. It carries the two things that matter here, a duration and
-     * a maximum acceptable age, as first class parameters. The streaming request
-     * has neither, so its update *interval* would have had to be abused as a
-     * deadline.
+     * [CurrentLocationRequest] rather than a streaming request because this is a
+     * single fix, not a stream. It carries a duration and a maximum acceptable age
+     * as first class parameters; the streaming request has neither.
      *
-     * The returned task resolves to null when the duration expires with no location,
-     * so the [withTimeoutOrNull] in [getBestFix] is a backstop rather than the
-     * mechanism the deadline relies on.
+     * The task resolves to null when the duration expires with no location, so the
+     * [withTimeoutOrNull] in [getBestFix] is a backstop rather than the mechanism
+     * the deadline relies on.
      */
     private suspend fun getCurrentLocation(budget: Duration): Location? {
         val request = CurrentLocationRequest.Builder()
@@ -134,14 +126,13 @@ class LocationProvider(context: Context) {
         private const val CURRENT_LOCATION_MAX_AGE = 0L
 
         /**
-         * Oldest fix that is still accepted as describing where the car is parked.
+         * Oldest fix still accepted as describing where the car is parked.
          *
-         * The car has already stopped by the time the disconnect fires, so the fix
-         * only has to be newer than the moment the car came to rest. Thirty seconds
-         * absorbs GMS derivation latency and the delay between disconnect and
-         * delivery. Anything looser and a fix taken before a drive would be
-         * accepted as the parking position; anything tighter and ordinary fixes
-         * would be rejected, leaving events with no location.
+         * The car has already stopped when the disconnect fires, so the fix only
+         * has to be newer than that moment. Thirty seconds absorbs GMS derivation
+         * latency and delivery delay. Anything looser accepts a fix from before
+         * the drive; anything tighter rejects ordinary fixes and leaves the record
+         * with no position.
          */
         internal val MAX_ACCEPTABLE_FIX_AGE = 30.seconds
 
@@ -185,10 +176,10 @@ fun Location.toLocationFix(): LocationFix = LocationFix(
 /**
  * How old a fix may be and still be accepted as the parking position.
  *
- * A fix of unknown age fails: the point of this check is to be able to say the
+ * A fix of unknown age fails: the point of the check is to be able to say the
  * location was measured at the time of the disconnect, and a fix that never had
  * elapsed realtime stamped on it cannot support that claim. GMS always stamps it,
- * so this is a guard against an unrecognised provider rather than a common case.
+ * so this guards against an unrecognised provider rather than a common case.
  */
 internal fun LocationFix.isFreshEnough(): Boolean =
     fixAgeMillis != null && fixAgeMillis <= LocationProvider.MAX_ACCEPTABLE_FIX_AGE.inWholeMilliseconds

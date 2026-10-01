@@ -17,9 +17,6 @@ interface HistoryDao {
     @Update
     suspend fun update(history: History)
 
-    @Query("SELECT * FROM history WHERE geocoded IS NULL ORDER BY timestamp ASC")
-    suspend fun getUngeocoded(): List<History>
-
     @Query("SELECT * FROM history WHERE id = :id")
     suspend fun getById(id: Long): History?
 

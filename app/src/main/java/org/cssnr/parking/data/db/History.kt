@@ -66,7 +66,6 @@ data class History(
     // fires so the event can never be lost, and the coordinates are filled in
     // separately; asking for a location is throttled for a background app and
     // sometimes produces nothing, which must not cost the record itself.
-    // [Migrations.MIGRATION_2_3] is what made these columns nullable.
     val latitude: Double?,
     val longitude: Double?,
 
@@ -89,15 +88,6 @@ data class History(
 
     @Embedded(prefix = "addr_")
     val address: LocationAddress = LocationAddress(),
-
-    // Set once a reverse geocode has succeeded, and that is the only thing the
-    // backfill keys off, so it must be set even when the provider returns an
-    // address with a null [LocationAddress.line]. Keying off the address columns
-    // instead would re-look-up those records on every launch forever.
-    //
-    // A lookup that returns nothing leaves this null so the record is retried. Kept
-    // nullable so MIGRATION_1_2 can add the column without a DEFAULT clause.
-    val geocoded: Boolean? = null,
 ) {
     /**
      * Whether this record has a position yet.

@@ -9,19 +9,13 @@ import java.time.Instant
 import kotlin.time.Duration.Companion.seconds
 
 /**
- * Coordinates the disconnect -> check automatic prefs -> record -> best location -> Room history add.
+ * Writes the parking event, then attaches a position to it.
  *
- * Recording is deliberately split in two. [recordDisconnect] writes the event and
- * returns immediately; [attachFix] attaches a position to it afterwards. The
- * split exists because the two halves have opposite failure modes, and the event
- * is the part that must never be lost.
- *
- * A disconnect is a fact the user cannot recreate: if the car is towed or the spot
- * is taken, the timestamp is gone forever. A position is a best-effort reading, and
- * for a background app "the location system service computes a new location for
- * your app only a few times each hour", so the request can legitimately come back
- * with nothing. Writing the event first means that outcome costs the coordinates
- * and nothing else.
+ * Split in two because the halves have opposite failure modes. The event is the
+ * part that must never be lost: a disconnect cannot be recreated, because if the
+ * car is towed the timestamp is gone. A position is best effort and the platform is
+ * free to refuse it, so writing the event first means a refusal costs the
+ * coordinates and nothing else.
  */
 class ParkingRecorder(
     private val automaticRepository: AutomaticRepository,
@@ -31,18 +25,11 @@ class ParkingRecorder(
 ) {
 
     /**
-     * Records that a parking event happened, without a position.
+     * Writes the event with no position, or returns null if this is not a
+     * disconnect ParKing tracks.
      *
-     * Returns the stored record, or null if this disconnect is not one ParKing is
-     * tracking. The record comes back so [attachFix] can update the same row.
-     *
-     * Every check here is a preference or permission read, so this is fast enough
-     * to run first and unconditionally. It is also the only place the tracking
-     * rules live, so a caller cannot get them subtly different.
-     *
-     * Each rejection is logged distinctly. "Nothing was recorded" has four very
-     * different causes here and a single message for all of them is what makes this
-     * kind of bug hard to see from a bug report.
+     * The returned id is what [attachFix] updates. Each rejection is logged
+     * distinctly, because "nothing was recorded" has four unrelated causes here.
      */
     suspend fun recordDisconnect(address: String, name: String?): History? {
         Log.d(TAG, "recordDisconnect - address: $address name: $name")
@@ -76,15 +63,11 @@ class ParkingRecorder(
     }
 
     /**
-     * Attaches a position to an already-recorded event and geocodes it.
+     * Attaches a position to an already-written event and geocodes it.
      *
-     * The two updates are chained from `located` rather than from the original
-     * record, so the geocode write cannot roll the coordinates back to null.
-     *
-     * The geocode is bounded by [GEOCODE_TIMEOUT] and its failure is not fatal: the
-     * position is already stored either way, and a record left with
-     * [History.geocoded] unset is what the backfill in HistoryViewModel keys off to
-     * retry it later.
+     * The two updates chain from `located`, so the geocode write cannot roll the
+     * coordinates back to null. A failed geocode is not fatal: the position is
+     * stored either way and the record keeps coordinates only.
      */
     suspend fun attachFix(record: History, fix: LocationFix) {
         Log.d(TAG, "fix: $fix")
@@ -110,7 +93,7 @@ class ParkingRecorder(
             Log.w(TAG, "no address for record ${record.id}, keeping coordinates only")
             return
         }
-        historyRepository.update(record.copy(address = address, geocoded = true))
+        historyRepository.update(record.copy(address = address))
         Log.d(TAG, "record ${record.id} address: $address")
     }
 

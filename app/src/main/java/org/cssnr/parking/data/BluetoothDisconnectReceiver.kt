@@ -18,35 +18,23 @@ import org.cssnr.parking.data.db.AppDatabase
 /**
  * Manifest-registered receiver for [BluetoothDevice.ACTION_ACL_DISCONNECTED].
  *
- * Its only job is to decide whether this is a disconnect ParKing cares about, write
- * the event, and hand the new row's id to [ParkingWatchService], which attaches a
- * position to it.
+ * Writes the event, then hands the new row's id to [ParkingWatchService], which
+ * attaches a position to it.
  *
- * The event is written here, inside the broadcast window, before anything else is
- * attempted. A disconnect is the one thing the user cannot recreate: if the car is
- * towed or the spot is taken, the timestamp is gone forever. A position is a
- * best-effort reading that the platform is free to refuse, so it is the part that
- * can be lost.
+ * The event is written here, inside the broadcast window, because it is the one
+ * thing the user cannot recreate. A position is best effort and can be lost.
  *
- * Why a service, measured on device rather than assumed: `getCurrentLocation`
- * called straight from this broadcast came back in 112ms with a fix 135 seconds
- * old and never woke the GNSS chip at all. The provider deferred the real work to
- * an alarm. `setMaxUpdateAgeMillis(0)` did not stop it. Foreground status is what
- * makes it block and derive a fix instead, so the service exists to hold that
- * status for the moment the request takes.
+ * The position is never resolved after the fact: a fix taken later is where the
+ * user is standing later, not where the car is.
  *
- * Why no `lastLocation`, the other obvious choice: it is cached per app, and
- * ParKing requests nothing while the car is being driven, so its value is wherever
- * the phone was before the trip.
+ * Measured on device, `getCurrentLocation` called straight from this broadcast
+ * came back in 112ms with a fix 135 seconds old and never woke the GNSS chip. The
+ * provider deferred the work to an alarm and `setMaxUpdateAgeMillis(0)` did not
+ * stop it, which is why the fix is asked for from a foreground service instead.
  *
- * The position is never resolved after the fact. A fix taken later is where the
- * user is standing later, not where the car is, and a record that looks located but
- * is not is worse than one that admits it has no position. If the service cannot be
- * started, the record simply has no coordinates and stays that way.
- *
- * The connect is deliberately not handled. Nothing is needed before the car stops,
- * and the notification is on screen for about a second, so there is nothing to
- * hold across a drive.
+ * `lastLocation` is not consulted either: it is cached per app, and ParKing asks
+ * for nothing during the drive, so it points at wherever the phone was before the
+ * trip.
  */
 class BluetoothDisconnectReceiver : BroadcastReceiver() {
 
@@ -88,8 +76,7 @@ class BluetoothDisconnectReceiver : BroadcastReceiver() {
                     return@launch
                 }
                 // The event is safe in the database now. Everything past this point
-                // is only about the position, so a refusal from here costs nothing
-                // but the coordinates.
+                // is only about the position, so a refusal costs nothing.
                 if (!ParkingWatchService.start(applicationContext, record.id)) {
                     Log.w(TAG, "record ${record.id} keeps no position, the service was refused")
                 }

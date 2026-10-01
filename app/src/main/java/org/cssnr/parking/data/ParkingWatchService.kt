@@ -21,22 +21,16 @@ import kotlin.time.Duration.Companion.seconds
 
 /**
  * Runs in the foreground just long enough to attach a position to one parking
- * event, so ParKing can ask for a location at the moment the car disconnects.
+ * event. It does not record the event: [BluetoothDisconnectReceiver] has already
+ * written the row, which is what makes the event safe regardless of what happens
+ * in here. This service owns nothing but the coordinates.
  *
- * It does not record the event. [BluetoothDisconnectReceiver] has already written
- * the row by the time this starts, which is what makes the event safe regardless of
- * what happens in here. This service owns nothing but the coordinates.
+ * Foreground status is the reason it exists. Android throttles location for a
+ * background app to "a few times each hour", and the fix request made from the
+ * broadcast returned a 135 second old position without waking the GNSS chip.
  *
- * Why a service at all: Android states that "if your app is running in the
- * background, the location system service computes a new location for your app
- * only a few times each hour. This is the case even when your app is requesting
- * more frequent location updates", and the fused provider's own reference names
- * the remedy: "apps may also use a foreground location service to maintain their
- * foreground status when they would normally be in the background".
- *
- * The connect is deliberately not handled. The fix is only needed once the car
- * has stopped, so starting here rather than at the connect keeps the mandatory
- * notification off screen for the length of the drive.
+ * The connect is deliberately not handled. The fix is only needed once the car has
+ * stopped, so the mandatory notification is not held on screen for the drive.
  */
 class ParkingWatchService : Service() {
 
@@ -85,27 +79,14 @@ class ParkingWatchService : Service() {
     /**
      * Attaches a position to an event the receiver has already written, then stops.
      *
-     * The event is already in the database by the time this runs, so this service
-     * owns nothing but the coordinates. Every failure mode here costs exactly the
-     * position: the record still exists, still shows when the car was parked, and
-     * simply carries no pin.
+     * Every failure here costs the position and nothing else: the record still
+     * exists and still shows when the car was parked.
      *
      * The work runs here rather than in the broadcast because a background
      * `BroadcastReceiver` is only allowed to run for "30 seconds or even a bit
-     * more" and the fresh fix request needs a budget of its own. A service has no
-     * such deadline, so the request can be given the time a real satellite fix
-     * needs instead of being cut off part way.
-     *
-     * Foreground status is the reason this file exists at all. Measured on device, a
-     * `getCurrentLocation` issued straight from the broadcast came back in 112ms
-     * with a fix 135 seconds old and never woke the GNSS chip; the provider
-     * deferred the real work to an alarm. With foreground status it blocks and
-     * derives a fix instead. `setMaxUpdateAgeMillis(0)` did not prevent the stale
-     * value in the background.
+     * more", and a real satellite fix needs a budget of its own.
      */
     private fun attachPosition(recordId: Long) {
-        Log.d(TAG, "attaching a position to record $recordId")
-
         scope.launch {
             try {
                 withTimeout(RECORD_BUDGET) {
@@ -147,16 +128,11 @@ class ParkingWatchService : Service() {
     /**
      * Enters the foreground, reporting whether the platform allowed it.
      *
-     * This can fail. `startForeground` with a `location` type throws
-     * `SecurityException` when the app is not in a state eligible for while-in-use
-     * access, and the background start itself throws
-     * `ForegroundServiceStartNotAllowedException`. Left uncaught, the first kills
-     * the process mid-disconnect and the second leaves the service unable to
-     * promote, so the caller has to be able to tell that neither worked.
-     *
-     * A refusal is not worth fighting. The event is already recorded by the time
-     * this runs, so the only thing lost is the position, and the service shuts down
-     * immediately rather than lingering without foreground status it will never get.
+     * This can fail: `startForeground` with a `location` type throws
+     * `SecurityException` when the app is not eligible for while-in-use access,
+     * and the background start itself throws
+     * `ForegroundServiceStartNotAllowedException`. A refusal is not worth fighting:
+     * the event is already written, so the only thing lost is the position.
      *
      * [ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION] arrived in API 29, below this
      * app's minimum, but it is a compile-time constant the compiler inlines by
@@ -187,30 +163,22 @@ class ParkingWatchService : Service() {
         private const val NO_RECORD_ID = -1L
 
         /**
-         * Total wall clock budget for placing one event.
-         *
-         * Generous, because it is dominated by the fresh fix request and the
-         * service has no broadcast deadline to respect. It exists only so that a
-         * genuinely hung call cannot leave the service running forever with its
-         * notification on screen.
+         * Total wall clock budget, dominated by the fix request. It exists so a
+         * genuinely hung call cannot leave the service and its notification up
+         * forever.
          */
         private val RECORD_BUDGET = 45.seconds
 
         /**
          * How long the fix request may take before the record is left without one.
-         *
-         * A service has no broadcast deadline, so this is not about the receiver's
-         * window. It only exists so a genuinely hung call cannot leave the service
-         * and its notification running forever.
          */
         private val FIX_BUDGET = 25.seconds
 
         /**
-         * Asks the service to place an already-recorded event, starting it.
+         * Asks the service to place an already-recorded event.
          *
-         * Returns whether the service was started. A false return means the platform
-         * refused a background foreground service start, which leaves no way to get a
-         * fresh fix, so the record keeps the position it has, which is none.
+         * Returns false if the platform refused a background foreground service
+         * start, which leaves the record with the position it has, which is none.
          */
         fun start(context: Context, recordId: Long): Boolean {
             val intent = Intent(context, ParkingWatchService::class.java)

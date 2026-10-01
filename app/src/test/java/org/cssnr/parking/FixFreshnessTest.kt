@@ -7,20 +7,14 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Covers the gate that decides whether a fix that arrived is allowed to be
- * recorded as the parking position.
+ * Covers the gate that decides whether an arrived fix is allowed to be recorded as
+ * the parking position.
  *
- * This gate is the real defence, not the request it sits behind. Asking the
- * provider for a freshly derived location is not a promise: its own documentation
- * for `CurrentLocationRequest.setMaxUpdateAgeMillis` notes that "it is possible
- * under unlikely conditions for location derivation to take longer than expected,
- * in which case freshly derived locations may have slightly older timestamps". On
- * device that is not theoretical: a request made with the age limit at zero came
- * back with a fix 181268ms old, which is a position from before the drive.
- *
- * The ages below are the ones that were actually observed on device, not invented
- * boundary values, because the whole justification for the gate is those
- * measurements.
+ * This gate is the real defence, not the request it sits behind. Asking for a
+ * freshly derived location is not a promise: a request made with the age limit at
+ * zero came back on device with a fix 181268ms old, which is a position from
+ * before the drive. The ages below are the ones actually observed, not invented
+ * boundary values, because those measurements are the whole justification.
  */
 class FixFreshnessTest {
 
