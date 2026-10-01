@@ -50,13 +50,18 @@ class ParkingWatchService : Service() {
         // Before anything else: the system kills a service that does not promote
         // itself to the foreground within a few seconds of being started this way.
         if (!promoteToForeground()) {
-            // Without foreground status there is no fresh fix to be had, and a
-            // record without one is not worth writing, so the event is dropped.
+            // Without foreground status there is no fresh fix to be had, but the
+            // disconnect is still real and still not reproducible. Record it without
+            // coordinates rather than dropping it; the position can be filled in
+            // later from the foreground.
             Log.e(
                 TAG,
-                "could not enter the foreground, dropping ${intent?.action} for " +
-                    "${intent?.getStringExtra(EXTRA_ADDRESS)}",
+                "could not enter the foreground, recording " +
+                    "${intent?.getStringExtra(EXTRA_ADDRESS)} without a position",
             )
+            if (intent?.action == ACTION_DEVICE_DISCONNECTED) {
+                recordWithoutPosition(intent)
+            }
             stopSelf()
             return START_NOT_STICKY
         }
@@ -71,6 +76,32 @@ class ParkingWatchService : Service() {
         return START_NOT_STICKY
     }
 
+    /**
+     * Records the event with no position, for when the foreground status this
+     * service exists to provide could not be had.
+     *
+     * This is the one path that cannot use the normal pipeline, because that
+     * pipeline's reason for existing is the fix. So it writes the same record the
+     * normal path writes, minus the location, and lets the foreground retry in
+     * HistoryViewModel place it later.
+     */
+    private fun recordWithoutPosition(intent: Intent) {
+        val address = intent.getStringExtra(EXTRA_ADDRESS).orEmpty()
+        val name = intent.getStringExtra(EXTRA_NAME)
+        scope.launch {
+            try {
+                ParkingRecorder(
+                    AutomaticRepository(applicationContext),
+                    HistoryRepository(AppDatabase.getDatabase(applicationContext)),
+                    ReverseGeocoder(applicationContext),
+                    applicationContext,
+                ).recordDisconnect(address, name)
+            } catch (e: Exception) {
+                Log.e(TAG, "could not record $address: ${e.message}", e)
+            }
+        }
+    }
+
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onDestroy() {
@@ -80,13 +111,25 @@ class ParkingWatchService : Service() {
     }
 
     /**
-     * Records the event and stops.
+     * Records the event, then tries to place it, then stops.
+     *
+     * The record is written first so it exists whatever happens to the location
+     * request. A disconnect is the one thing the user cannot recreate; a position is
+     * a best effort that the platform is free to refuse. A failure here costs the
+     * coordinates and nothing else.
      *
      * The work runs here rather than in the broadcast because a background
      * `BroadcastReceiver` is only allowed to run for "30 seconds or even a bit
      * more" and the fresh fix request needs a budget of its own. A service has no
      * such deadline, so the request can be given the time a real satellite fix
      * needs instead of being cut off part way.
+     *
+     * Foreground status is the reason this file exists at all. Measured on device, a
+     * `getCurrentLocation` issued straight from the broadcast came back in 112ms
+     * with a fix 135 seconds old and never woke the GNSS chip; the provider
+     * deferred the real work to an alarm. With foreground status it blocks and
+     * derives a fix instead. `setMaxUpdateAgeMillis(0)` did not prevent the stale
+     * value in the background.
      */
     private fun onDeviceDisconnected(intent: Intent) {
         val address = intent.getStringExtra(EXTRA_ADDRESS).orEmpty()
@@ -96,13 +139,23 @@ class ParkingWatchService : Service() {
         scope.launch {
             try {
                 withTimeout(RECORD_BUDGET) {
-                    ParkingRecorder(
+                    val recorder = ParkingRecorder(
                         AutomaticRepository(applicationContext),
                         HistoryRepository(AppDatabase.getDatabase(applicationContext)),
-                        locationProvider,
                         ReverseGeocoder(applicationContext),
                         applicationContext,
-                    ).recordDisconnect(address, name)
+                    )
+                    val record = recorder.recordDisconnect(address, name)
+                    if (record == null) {
+                        Log.d(TAG, "$address is not a selected device, ignoring")
+                        return@withTimeout
+                    }
+                    val fix = locationProvider.getBestFix(FIX_BUDGET)
+                    if (fix == null) {
+                        Log.w(TAG, "record ${record.id} has no position yet, it stays unresolved")
+                    } else {
+                        recorder.attachFix(record, fix)
+                    }
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "failed to record the event: ${e.message}", e)
@@ -164,6 +217,15 @@ class ParkingWatchService : Service() {
         private val RECORD_BUDGET = 45.seconds
 
         /**
+         * How long the fix request may take before the record is left without one.
+         *
+         * A service has no broadcast deadline, so this is not about the receiver's
+         * window. It only exists so a genuinely hung call cannot leave the service
+         * and its notification running forever.
+         */
+        private val FIX_BUDGET = 25.seconds
+
+        /**
          * Hands a disconnect to the service, starting it.
          *
          * Returns whether the service was started. A false return means the
@@ -190,18 +252,6 @@ class ParkingWatchService : Service() {
                 )
                 false
             }
-        }
-
-        /**
-         * Stops a running service, for when the user turns automatic tracking off.
-         *
-         * `stopService` rather than a `startService` carrying a stop action: the
-         * latter would start the service in order to stop it, flashing the
-         * foreground notification every time tracking is switched off.
-         */
-        fun stop(context: Context) {
-            runCatching { context.stopService(Intent(context, ParkingWatchService::class.java)) }
-                .onFailure { Log.d(TAG, "nothing to stop: ${it.message}") }
         }
     }
 }

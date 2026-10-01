@@ -9,75 +9,97 @@ import java.time.Instant
 import kotlin.time.Duration.Companion.seconds
 
 /**
- * Coordinates the disconnect -> check automatic prefs -> best location -> Room history add.
+ * Coordinates the disconnect -> check automatic prefs -> record -> best location -> Room history add.
  *
- * The coordinate record is written first and the reverse geocode is applied
- * afterwards as a separate update, so a slow or unreachable geocoding backend can
- * never cost you a parking spot.
+ * Recording is deliberately split in two. [recordDisconnect] writes the event and
+ * returns immediately; [attachFix] attaches a position to it afterwards. The
+ * split exists because the two halves have opposite failure modes, and the event
+ * is the part that must never be lost.
+ *
+ * A disconnect is a fact the user cannot recreate: if the car is towed or the spot
+ * is taken, the timestamp is gone forever. A position is a best-effort reading, and
+ * for a background app "the location system service computes a new location for
+ * your app only a few times each hour", so the request can legitimately come back
+ * with nothing. Writing the event first means that outcome costs the coordinates
+ * and nothing else.
  */
 class ParkingRecorder(
     private val automaticRepository: AutomaticRepository,
     private val historyRepository: HistoryRepository,
-    private val locationProvider: LocationProvider,
     private val reverseGeocoder: ReverseGeocoder,
     private val context: Context,
 ) {
 
     /**
-     * Attempts to record a parking event for the given Bluetooth device address.
-     * Returns true if a history record was added.
+     * Records that a parking event happened, without a position.
      *
-     * No fix means no record. The alternative is writing the position the provider
-     * was already holding, which is the stale value this pipeline exists to avoid,
-     * so a missing fix drops the event rather than misplacing it.
+     * Returns the stored record, or null if this disconnect is not one ParKing is
+     * tracking. The record comes back so [attachFix] can update the same row.
      *
-     * TODO: IDE says this function is never used
+     * Every check here is a preference or permission read, so this is fast enough
+     * to run first and unconditionally. It is also the only place the tracking
+     * rules live, so a caller cannot get them subtly different.
+     *
+     * Each rejection is logged distinctly. "Nothing was recorded" has four very
+     * different causes here and a single message for all of them is what makes this
+     * kind of bug hard to see from a bug report.
      */
-    suspend fun recordDisconnect(address: String, name: String?): Boolean {
+    suspend fun recordDisconnect(address: String, name: String?): History? {
         Log.d(TAG, "recordDisconnect - address: $address name: $name")
-        if (address.isBlank()) return false
-        if (!automaticRepository.automaticEnabled.first()) return false
-        if (!LocationProvider.hasLocationPermission(context)) return false
-        Log.d(
-            TAG,
-            "selectedBluetoothDevices: ${automaticRepository.selectedBluetoothDevices}"
-        )
-        val selected = automaticRepository.selectedBluetoothDevices.first()
-        Log.d(TAG, "selected: $selected")
-        if (address !in selected) return false
-        val fix = locationProvider.getBestFix() ?: run {
-            Log.w(TAG, "no fresh fix for $address, no record written")
-            return false
+        if (address.isBlank()) {
+            Log.d(TAG, "no address, not a device we can match")
+            return null
         }
-        Log.d(TAG, "fix: $fix")
-        val history = History(
+        if (!automaticRepository.automaticEnabled.first()) {
+            Log.d(TAG, "automatic tracking is off")
+            return null
+        }
+        if (!LocationProvider.hasLocationPermission(context)) {
+            Log.w(TAG, "no location permission, cannot ever place $address")
+            return null
+        }
+        val selected = automaticRepository.selectedBluetoothDevices.first()
+        if (address !in selected) {
+            Log.d(TAG, "$address is not selected (selected: $selected)")
+            return null
+        }
+        val record = History(
             timestamp = Instant.now().toEpochMilli(),
-            latitude = fix.latitude,
-            longitude = fix.longitude,
+            latitude = null,
+            longitude = null,
             bluetoothAddress = address,
             bluetoothName = name,
+        )
+        val id = historyRepository.add(record)
+        Log.d(TAG, "recorded $id without a position, waiting on a fix")
+        return record.copy(id = id)
+    }
+
+    /**
+     * Attaches a position to an already-recorded event and geocodes it.
+     *
+     * The two updates are chained from `located` rather than from the original
+     * record, so the geocode write cannot roll the coordinates back to null.
+     *
+     * The geocode is bounded by [GEOCODE_TIMEOUT] and its failure is not fatal: the
+     * position is already stored either way, and a record left with
+     * [History.geocoded] unset is what the backfill in HistoryViewModel keys off to
+     * retry it later.
+     */
+    suspend fun attachFix(record: History, fix: LocationFix) {
+        Log.d(TAG, "fix: $fix")
+        val located = record.copy(
+            latitude = fix.latitude,
+            longitude = fix.longitude,
             fixAgeMillis = fix.fixAgeMillis,
             accuracy = fix.accuracy,
             altitude = fix.altitude,
             verticalAccuracy = fix.verticalAccuracy,
         )
-        Log.d(TAG, "historyRepository.add - history: $history")
-        val id = historyRepository.add(history)
-        attachAddress(history.copy(id = id), fix)
-        return true
+        historyRepository.update(located)
+        attachAddress(located, fix)
     }
 
-    /**
-     * Reverse geocodes the record and writes the address components back.
-     *
-     * Bounded by [GEOCODE_TIMEOUT] so a hung geocoder cannot stall the pipeline.
-     * That is not the whole budget: the receiver wraps this call in a total
-     * timeout, which is what actually bounds the broadcast.
-     *
-     * A failed lookup is dropped and the record left with [History.geocoded] unset,
-     * which is the signal for the backfill to retry it later. The coordinates are
-     * already stored either way.
-     */
     private suspend fun attachAddress(record: History, fix: LocationFix) {
         val address = withTimeoutOrNull(GEOCODE_TIMEOUT) {
             runCatching { reverseGeocoder.reverseGeocode(fix.latitude, fix.longitude) }

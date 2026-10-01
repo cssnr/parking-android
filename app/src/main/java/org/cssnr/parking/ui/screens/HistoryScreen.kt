@@ -171,7 +171,10 @@ private fun HistoryRow(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick),
+            // A record with no position has nothing to show on a map, so it is not
+            // a target. It is still listed and still deletable, because the
+            // disconnect itself is a real event worth keeping.
+            .clickable(enabled = record.hasFix) { onClick() },
     ) {
         Row(
             modifier = Modifier

@@ -121,16 +121,24 @@ fun ParKingApp() {
                     trackingStatus = trackingStatus,
                     onTrackingStatusClick = onTrackingStatusClick,
                     onRecordClick = { record ->
-                        navController.navigate(
-                            MapDetail(
-                                id = record.id,
-                                title = record.displayName,
-                                device = record.bluetoothName ?: record.bluetoothAddress,
-                                latitude = record.latitude,
-                                longitude = record.longitude,
-                                timestamp = record.timestamp,
-                            ),
-                        )
+                        val latitude = record.latitude
+                        val longitude = record.longitude
+                        // A record with no position is not a navigation target. The
+                        // disconnect was still recorded, the row is still listed,
+                        // and HistoryViewModel keeps retrying for a fix in the
+                        // foreground.
+                        if (latitude != null && longitude != null) {
+                            navController.navigate(
+                                MapDetail(
+                                    id = record.id,
+                                    title = record.displayName,
+                                    device = record.bluetoothName ?: record.bluetoothAddress,
+                                    latitude = latitude,
+                                    longitude = longitude,
+                                    timestamp = record.timestamp,
+                                ),
+                            )
+                        }
                     },
                 )
             }

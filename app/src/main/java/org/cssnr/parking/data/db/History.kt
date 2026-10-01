@@ -61,15 +61,22 @@ data class History(
     @PrimaryKey(autoGenerate = true)
     val id: Long = 0,
     val timestamp: Long,
-    val latitude: Double,
-    val longitude: Double,
+
+    // Null until a position is attached. The disconnect is recorded the instant it
+    // fires so the event can never be lost, and the coordinates are filled in
+    // separately; asking for a location is throttled for a background app and
+    // sometimes produces nothing, which must not cost the record itself.
+    // [Migrations.MIGRATION_2_3] is what made these columns nullable.
+    val latitude: Double?,
+    val longitude: Double?,
+
     val bluetoothAddress: String,
     val bluetoothName: String? = null,
 
     // Location fix metadata. All nullable: the platform guarantees only latitude,
     // longitude, timestamp and accuracy on provider generated locations, and a fix
-    // is only recorded at all once it has passed LocationProvider's age check, which
-    // is itself driven by [fixAgeMillis] being present.
+    // of unknown age is rejected by LocationProvider.isFreshEnough before it gets
+    // this far.
     // [fixAgeMillis] is how stale the fix was at the moment it was recorded.
     val fixAgeMillis: Long? = null,
     val accuracy: Float? = null,
@@ -93,11 +100,26 @@ data class History(
     val geocoded: Boolean? = null,
 ) {
     /**
+     * Whether this record has a position yet.
+     *
+     * False for a disconnect whose location request produced nothing. The record
+     * is still a real parking event, so it is still listed and still deletable;
+     * there is just nothing to centre a map on.
+     */
+    val hasFix: Boolean
+        get() = latitude != null && longitude != null
+
+    /**
      * Best available label for this record: the reverse geocoded address when the
-     * geocoder produced one, otherwise the raw coordinates. Never blank, so it is
-     * safe to use directly as a title.
+     * geocoder produced one, otherwise the raw coordinates, otherwise a placeholder
+     * because the location request came back empty. Never blank, so it is safe to
+     * use directly as a title.
      */
     val displayName: String
         get() = address.displayLabel
-            ?: String.format(Locale.US, "%.5f, %.5f", latitude, longitude)
+            ?: if (hasFix) {
+                String.format(Locale.US, "%.5f, %.5f", latitude, longitude)
+            } else {
+                "Location not recorded"
+            }
 }

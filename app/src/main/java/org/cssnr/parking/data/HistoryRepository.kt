@@ -19,6 +19,9 @@ class HistoryRepository(database: AppDatabase) {
 
     suspend fun getUngeocoded(): List<History> = historyDao.getUngeocoded()
 
+    suspend fun getUnlocatedSince(notBefore: Long): List<History> =
+        historyDao.getUnlocatedSince(notBefore)
+
     suspend fun delete(id: Long) {
         historyDao.deleteById(id)
     }

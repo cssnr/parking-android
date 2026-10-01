@@ -47,55 +47,35 @@ class LocationProvider(context: Context) {
         LocationServices.getFusedLocationProviderClient(context)
 
     /**
-     * The fix to record for the parking spot, or null if nothing usable exists.
+     * The fix to record for the parking spot, or null if nothing usable arrived
+     * within [budget].
      *
-     * A freshly requested fix is the only source. `lastLocation` is deliberately
-     * gone: it is the position the provider happened to be holding, which is
-     * exactly the stale value this is meant to avoid recording.
+     * `lastLocation` is deliberately not consulted. It is cached per app, and
+     * ParKing asks for nothing while the car is being driven, so its value is
+     * whatever the platform last computed for ParKing specifically, which is
+     * typically wherever the phone was before the trip. That is the stale location
+     * this pipeline exists to avoid.
      *
-     * The network attempt is the fallback and is deliberately last, so the common
-     * case never spends extra seconds waiting for a coarser fix it does not need.
-     * It only runs when no satellite fix could be derived, where a few seconds of
-     * waiting beats recording nothing.
-     *
-     * A null return is a normal outcome, not a failure: the caller records nothing
-     * rather than writing a position from before the drive.
+     * A null return is a normal outcome, not a failure. ParKing is a background app
+     * at this point and "the location system service computes a new location for
+     * your app only a few times each hour", so the request is throttled and is
+     * allowed to come back with nothing. The caller records the event regardless and
+     * simply has no position for it yet.
      */
-    suspend fun getBestFix(): LocationFix? {
-        getFreshLocation(Priority.PRIORITY_HIGH_ACCURACY, FRESH_FIX_TIMEOUT)?.let { return it }
-        Log.d(TAG, "no satellite fix, trying a network fix")
-        return getFreshLocation(Priority.PRIORITY_BALANCED_POWER_ACCURACY, NETWORK_FIX_TIMEOUT)
-    }
-
-    /**
-     * Asks for one fix and accepts it only if it is recent enough to describe
-     * where the car is parked right now.
-     *
-     * The age gate is not redundant with [CURRENT_LOCATION_MAX_AGE]. That setting
-     * only rules out a *historical* location: the request's own documentation
-     * notes that "it is possible under unlikely conditions for location derivation
-     * to take longer than expected, in which case freshly derived locations may
-     * have slightly older timestamps". The age is therefore checked on what
-     * actually arrived rather than on what was asked for.
-     */
-    private suspend fun getFreshLocation(priority: Int, budget: Duration): LocationFix? {
+    suspend fun getBestFix(budget: Duration): LocationFix? {
         val started = SystemClock.elapsedRealtime()
-        val location = withTimeoutOrNull(budget) { getCurrentLocation(priority, budget) }
+        val location = withTimeoutOrNull(budget) { getCurrentLocation(budget) }
         val elapsed = SystemClock.elapsedRealtime() - started
         if (location == null) {
-            Log.d(TAG, "${priority.priorityName()} gave up after ${elapsed}ms of $budget")
+            Log.d(TAG, "no fix after ${elapsed}ms of $budget")
             return null
         }
         val fix = location.toLocationFix()
-        Log.d(
-            TAG,
-            "${priority.priorityName()} fix aged ${fix.fixAgeMillis}ms " +
-                "accuracy ${fix.accuracy}m",
-        )
+        Log.d(TAG, "fix aged ${fix.fixAgeMillis}ms accuracy ${fix.accuracy}m in ${elapsed}ms")
         if (!fix.isFreshEnough()) {
             Log.w(
                 TAG,
-                "discarding ${priority.priorityName()} fix aged " +
+                "discarding fix aged " +
                     "${fix.fixAgeMillis?.let { "${it}ms" } ?: "unknown"}: " +
                     "older than $MAX_ACCEPTABLE_FIX_AGE",
             )
@@ -107,19 +87,20 @@ class LocationProvider(context: Context) {
     /**
      * One-shot request for the current location.
      *
-     * [CurrentLocationRequest] rather than a streaming [com.google.android.gms.location.LocationRequest]
-     * because this is a single fix, not a stream. It carries the two things that
-     * matter here, a duration and a maximum acceptable age, as first class
-     * parameters. The streaming request has neither, so its update *interval*
-     * would have had to be abused as a deadline.
+     * [CurrentLocationRequest] rather than a streaming
+     * [com.google.android.gms.location.LocationRequest] because this is a single
+     * fix, not a stream. It carries the two things that matter here, a duration and
+     * a maximum acceptable age, as first class parameters. The streaming request
+     * has neither, so its update *interval* would have had to be abused as a
+     * deadline.
      *
-     * The returned task resolves to null when the duration expires with no
-     * location, so [withTimeoutOrNull] above is a backstop rather than the
+     * The returned task resolves to null when the duration expires with no location,
+     * so the [withTimeoutOrNull] in [getBestFix] is a backstop rather than the
      * mechanism the deadline relies on.
      */
-    private suspend fun getCurrentLocation(priority: Int, budget: Duration): Location? {
+    private suspend fun getCurrentLocation(budget: Duration): Location? {
         val request = CurrentLocationRequest.Builder()
-            .setPriority(priority)
+            .setPriority(Priority.PRIORITY_HIGH_ACCURACY)
             .setDurationMillis(budget.inWholeMilliseconds)
             // "A value of 0 indicates that only freshly derived locations will be
             // returned, and no historical locations will ever be returned." The
@@ -135,7 +116,7 @@ class LocationProvider(context: Context) {
                     if (continuation.isActive) continuation.resume(location)
                 }
                 .addOnFailureListener {
-                    Log.w(TAG, "${priority.priorityName()} request failed: ${it.message}")
+                    Log.w(TAG, "request failed: ${it.message}")
                     if (continuation.isActive) continuation.resume(null)
                 }
         }
@@ -143,21 +124,6 @@ class LocationProvider(context: Context) {
 
     companion object {
         private const val TAG = "LocationProvider"
-
-        /**
-         * How long to wait for the satellite-quality fix asked for at disconnect.
-         *
-         * Sized for a real cold start rather than a warm one: a parking garage or
-         * under a metal roof can push a first fix well past the couple of seconds an
-         * open sky would take, and the alternative to waiting is recording nothing.
-         */
-        private val FRESH_FIX_TIMEOUT = 25.seconds
-
-        /**
-         * How long to wait for the network-derived fix, used only when no satellite
-         * fix could be derived. Short, because there is nothing better to wait for.
-         */
-        private val NETWORK_FIX_TIMEOUT = 10.seconds
 
         /**
          * Age limit passed to the request itself, in milliseconds.
@@ -191,6 +157,8 @@ class LocationProvider(context: Context) {
     }
 }
 
+private const val NANOS_PER_MILLI = 1_000_000L
+
 /**
  * Reads a platform [Location] into a [LocationFix], guarding every optional
  * accessor with its `has*()` check.
@@ -214,8 +182,6 @@ fun Location.toLocationFix(): LocationFix = LocationFix(
     verticalAccuracy = if (hasVerticalAccuracy()) verticalAccuracyMeters else null,
 )
 
-private const val NANOS_PER_MILLI = 1_000_000L
-
 /**
  * How old a fix may be and still be accepted as the parking position.
  *
@@ -226,14 +192,6 @@ private const val NANOS_PER_MILLI = 1_000_000L
  */
 internal fun LocationFix.isFreshEnough(): Boolean =
     fixAgeMillis != null && fixAgeMillis <= LocationProvider.MAX_ACCEPTABLE_FIX_AGE.inWholeMilliseconds
-
-private fun Int.priorityName(): String = when (this) {
-    Priority.PRIORITY_HIGH_ACCURACY -> "high accuracy"
-    Priority.PRIORITY_BALANCED_POWER_ACCURACY -> "balanced power"
-    Priority.PRIORITY_LOW_POWER -> "low power"
-    Priority.PRIORITY_PASSIVE -> "passive"
-    else -> "priority $this"
-}
 
 /**
  * Reads a MapLibre [LocationMeasurement] into a [LocationFix], so the manual save

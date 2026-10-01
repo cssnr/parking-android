@@ -41,7 +41,8 @@
 
         <!-- Records parking spot when a selected Bluetooth device disconnects. The
              connect is deliberately not handled: the service below is started here
-             so its notification only exists for the seconds it takes to read a fix. -->
+             and stopped as soon as the event is written, so its notification is
+             only on screen for the moment the fix takes. -->
         <receiver
             android:name=".data.BluetoothDisconnectReceiver"
             android:exported="true">
@@ -51,11 +52,11 @@
             </intent-filter>
         </receiver>
 
-        <!-- Puts the app in the foreground for the few seconds it takes to read a
-             fresh fix. A background app is only offered a new location "a few times
-             each hour", which is what stopped a parking spot from ever being
-             recorded. It is started from the background by the broadcast above, so
-             ACCESS_BACKGROUND_LOCATION has to stay granted. -->
+        <!-- Puts the app in the foreground for the moment it takes to read a fix.
+             A background app is only offered a new location "a few times each
+             hour", and getCurrentLocation returns the cached position immediately
+             rather than waiting, which is a position from before the drive. Foreground
+             status is what makes the provider actually derive a new one. -->
         <service
             android:name=".data.ParkingWatchService"
             android:exported="false"
