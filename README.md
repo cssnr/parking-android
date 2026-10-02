@@ -24,7 +24,7 @@
 [![Language: Kotlin](https://img.shields.io/badge/Language-Kotlin-7f52ff?style=for-the-badge&logo=kotlin&color=16a1e0&labelColor=1e1e2e)](https://kotlinlang.org/)
 [![Toolkit: Jetpack Compose](https://img.shields.io/badge/Toolkit-Jetpack_Compose-4285f4?style=for-the-badge&logo=jetpack-compose&color=16a1e0&labelColor=1e1e2e)](https://developer.android.com/compose)
 [![Design: Material 3](https://img.shields.io/badge/Design-Material_3-000000?style=for-the-badge&logo=material-design&color=16a1e0&labelColor=1e1e2e)](https://m3.material.io/)
-[![License: GPL-3.0](https://img.shields.io/badge/License_3-000000?style=for-the-badge&logo=gplv3&color=16a1e0&labelColor=1e1e2e)](#GPL-3.0-1-ov-file)
+[![License: GPL-3.0](https://img.shields.io/badge/License-GPL--3.0-000000?style=for-the-badge&logo=gplv3&color=16a1e0&labelColor=1e1e2e)](#GPL-3.0-1-ov-file)
 
 # ParKing Android
 
@@ -45,8 +45,9 @@ Parking Android application, built with Kotlin, Jetpack Compose and Material 3.
 
 Automatically detect **where** you parked your car...
 
-> [!NOTE]  
-> This app is in early release for testing.  
+> [!WARNING]  
+> This app is currently in **beta** testing.
+> Expect bugs and/or breaking changes along the way...
 > Please report any [Issues](https://github.com/cssnr/parking-android/issues) you find.
 
 ## Install

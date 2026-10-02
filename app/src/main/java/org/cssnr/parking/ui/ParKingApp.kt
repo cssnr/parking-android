@@ -29,10 +29,12 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
 import org.cssnr.parking.R
 import org.cssnr.parking.ui.navigation.Automatic
+import org.cssnr.parking.ui.navigation.About
 import org.cssnr.parking.ui.navigation.History
 import org.cssnr.parking.ui.navigation.Location
 import org.cssnr.parking.ui.navigation.MapDetail
 import org.cssnr.parking.ui.navigation.Settings
+import org.cssnr.parking.ui.screens.AboutRoute
 import org.cssnr.parking.ui.screens.AutomaticRoute
 import org.cssnr.parking.ui.screens.HistoryRoute
 import org.cssnr.parking.ui.screens.LocationRoute
@@ -69,6 +71,7 @@ fun ParKingApp() {
         contentWindowInsets = ScaffoldDefaults.contentWindowInsets
             .only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom),
         bottomBar = {
+            if (currentDestination?.hasRoute(About::class) != true) {
             NavigationBar {
                 Destination.entries.forEach { destination ->
                     val selected = currentDestination?.hierarchy
@@ -100,6 +103,7 @@ fun ParKingApp() {
                         label = { Text(destination.label) },
                     )
                 }
+            }
             }
         },
     ) { innerPadding ->
@@ -163,6 +167,12 @@ fun ParKingApp() {
                 SettingsRoute(
                     trackingStatus = trackingStatus,
                     onTrackingStatusClick = onTrackingStatusClick,
+                    onNavigateToAbout = { navController.navigate(About) },
+                )
+            }
+            composable<About> {
+                AboutRoute(
+                    onBack = { navController.navigateUp() },
                 )
             }
         }

@@ -23,3 +23,6 @@ data object Automatic
 
 @Serializable
 data object Settings
+
+@Serializable
+data object About
