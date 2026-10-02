@@ -66,7 +66,7 @@ class LocationViewModel(application: Application) : AndroidViewModel(application
      * [org.cssnr.parking.data.ParkingRecorder] does it in that order: a
      * geocoding failure must not lose the position.
      */
-    fun addInitialLocation(fix: LocationFix) {
+    fun addManualLocation(fix: LocationFix) {
         viewModelScope.launch {
             val record = History(
                 timestamp = System.currentTimeMillis(),

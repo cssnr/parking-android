@@ -41,6 +41,7 @@ fun LocationRoute(
     var launchingPermission by remember { mutableStateOf(false) }
     var pendingSave by remember { mutableStateOf(false) }
     var saveFailed by remember { mutableStateOf(false) }
+    var showManualConfirm by remember { mutableStateOf(false) }
 
     val locationPermissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -70,8 +71,33 @@ fun LocationRoute(
     LaunchedEffect(pendingSave, locationState.lastLocation) {
         if (!pendingSave) return@LaunchedEffect
         val measurement = locationState.lastLocation ?: return@LaunchedEffect
-        viewModel.addInitialLocation(measurement.toLocationFix())
+        viewModel.addManualLocation(measurement.toLocationFix())
         pendingSave = false
+    }
+
+    val requestManualSave: () -> Unit = {
+        saveFailed = false
+        showManualConfirm = false
+        if (context.hasLocationPermission()) {
+            // Save immediately when a fix is already available. Going through
+            // pendingSave in that case shows the "Getting your current location"
+            // dialog for a single frame before the LaunchedEffect below saves and
+            // clears it, which reads as a flash.
+            val measurement = locationState.lastLocation
+            if (measurement != null) {
+                viewModel.addManualLocation(measurement.toLocationFix())
+            } else {
+                pendingSave = true
+            }
+        } else {
+            launchingPermission = true
+            locationPermissionLauncher.launch(
+                arrayOf(
+                    Manifest.permission.ACCESS_FINE_LOCATION,
+                    Manifest.permission.ACCESS_COARSE_LOCATION,
+                )
+            )
+        }
     }
 
     val detail = uiState.latestRecord?.let { record ->
@@ -102,6 +128,11 @@ fun LocationRoute(
         onBack = null,
         trackingStatus = trackingStatus,
         onTrackingStatusClick = onTrackingStatusClick,
+        onAddManualLocation = {
+            saveFailed = false
+            showManualConfirm = true
+        },
+        isSavingLocation = pendingSave,
     )
 
     val showInitialPrompt = uiState.shouldShowInitialPrompt &&
@@ -117,6 +148,22 @@ fun LocationRoute(
             confirmButton = {},
             dismissButton = {
                 TextButton(onClick = { pendingSave = false }) {
+                    Text("Cancel")
+                }
+            },
+        )
+    } else if (showManualConfirm && !launchingPermission) {
+        AlertDialog(
+            onDismissRequest = { showManualConfirm = false },
+            title = { Text("Manually Park Car") },
+            text = { Text("Park car at your current location?") },
+            confirmButton = {
+                TextButton(onClick = requestManualSave) {
+                    Text("Add")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showManualConfirm = false }) {
                     Text("Cancel")
                 }
             },
@@ -141,20 +188,7 @@ fun LocationRoute(
             },
             confirmButton = {
                 TextButton(
-                    onClick = {
-                        saveFailed = false
-                        if (context.hasLocationPermission()) {
-                            pendingSave = true
-                        } else {
-                            launchingPermission = true
-                            locationPermissionLauncher.launch(
-                                arrayOf(
-                                    Manifest.permission.ACCESS_FINE_LOCATION,
-                                    Manifest.permission.ACCESS_COARSE_LOCATION,
-                                )
-                            )
-                        }
-                    },
+                    onClick = requestManualSave,
                 ) {
                     Text("Add Location")
                 }
@@ -162,6 +196,22 @@ fun LocationRoute(
             dismissButton = {
                 TextButton(onClick = { viewModel.dismissInitialLocationPrompt() }) {
                     Text("Skip")
+                }
+            },
+        )
+    } else if (saveFailed) {
+        AlertDialog(
+            onDismissRequest = { saveFailed = false },
+            title = { Text("Location Permission Required") },
+            text = {
+                Text(
+                    "Location permission is required to save your parking spot. " +
+                        "Enable location access in system settings, then try again."
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = { saveFailed = false }) {
+                    Text("OK")
                 }
             },
         )

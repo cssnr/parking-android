@@ -136,12 +136,6 @@ fun HistoryScreen(
                     text = "No parking history yet",
                     style = MaterialTheme.typography.titleMedium,
                 )
-                Spacer(modifier = Modifier.size(8.dp))
-                Text(
-                    text = "Disconnect your car's Bluetooth device to record a parking spot.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
             }
         } else {
             LazyColumn(
@@ -185,7 +179,7 @@ private fun HistoryRow(
         ) {
             if (record.bluetoothAddress.isBlank()) {
                 Icon(
-                    painter = painterResource(R.drawable.md_pin_road_24px),
+                    painter = painterResource(R.drawable.md_parking_sign_24px),
                     contentDescription = null,
                     modifier = Modifier.size(24.dp),
                     tint = MaterialTheme.colorScheme.primary,
