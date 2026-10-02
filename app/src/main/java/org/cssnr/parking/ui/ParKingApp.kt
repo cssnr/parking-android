@@ -47,9 +47,9 @@ enum class Destination(
     val icon: ImageVector?,
     @DrawableRes val iconRes: Int? = null,
 ) {
-    LOCATION(Location, "Location", null, R.drawable.md_pin_road_24px),
+    LOCATION(Location, "Location", null, R.drawable.md_parking_sign_24px),
     HISTORY(History, "History", Icons.Filled.History),
-    AUTOMATIC(Automatic, "Automatic", null, R.drawable.md_parking_sign_24px),
+    AUTOMATIC(Automatic, "Automatic", null, R.drawable.md_pin_road_24px),
     SETTINGS(Settings, "Settings", Icons.Filled.Settings),
 }
 
