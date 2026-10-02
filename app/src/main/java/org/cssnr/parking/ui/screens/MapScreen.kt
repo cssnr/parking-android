@@ -2,12 +2,14 @@ package org.cssnr.parking.ui.screens
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AddCircle
+import androidx.compose.material.icons.filled.LocationSearching
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
@@ -19,6 +21,10 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.res.painterResource
+import kotlinx.coroutines.launch
+import org.cssnr.parking.R
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -179,6 +185,7 @@ fun MapScreen(
             val target = parkingPosition ?: return@LaunchedEffect
             mapState.setCameraPosition(CameraPosition(target = target, zoom = 17.0))
         }
+        val cameraScope = rememberCoroutineScope()
 
         Box(
             modifier = Modifier
@@ -189,6 +196,50 @@ fun MapScreen(
                 modifier = Modifier.fillMaxSize(),
                 state = mapState,
             )
+            if (parkingPosition != null || userPosition != null) {
+                Column(
+                    modifier = Modifier
+                        .align(Alignment.BottomStart)
+                        // Same bottom offset as the add button, so the lower FAB
+                        // sits at the same height just above the attribution row.
+                        .padding(bottom = 60.dp, start = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    if (parkingPosition != null) {
+                        FloatingActionButton(
+                            onClick = {
+                                cameraScope.launch {
+                                    mapState.setCameraPosition(
+                                        CameraPosition(target = parkingPosition, zoom = 17.0),
+                                    )
+                                }
+                            },
+                        ) {
+                            Icon(
+                                painter = painterResource(R.drawable.md_parking_sign_24px),
+                                contentDescription = "Jump to car location",
+                            )
+                        }
+                    }
+                    if (userPosition != null) {
+                        FloatingActionButton(
+                            onClick = {
+                                cameraScope.launch {
+                                    mapState.setCameraPosition(
+                                        CameraPosition(target = userPosition, zoom = 17.0),
+                                    )
+                                }
+                            },
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.LocationSearching,
+                                contentDescription = "Jump to current location",
+                            )
+                        }
+                    }
+                }
+            }
             if (onAddManualLocation != null) {
                 FloatingActionButton(
                     onClick = onAddManualLocation,
