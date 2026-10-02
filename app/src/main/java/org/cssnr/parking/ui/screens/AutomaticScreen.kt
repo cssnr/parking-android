@@ -29,7 +29,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bluetooth
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.Layers
-import androidx.compose.material.icons.filled.Power
+import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.ShareLocation
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
@@ -80,7 +80,13 @@ fun AutomaticRoute(
     val automaticEnabled by viewModel.automaticEnabled.collectAsStateWithLifecycle()
     val selectedBluetoothDevices by viewModel.selectedBluetoothDevices.collectAsStateWithLifecycle()
 
-    var fineLocationGranted by remember { mutableStateOf(LocationProvider.hasLocationPermission(context)) }
+    var fineLocationGranted by remember {
+        mutableStateOf(
+            LocationProvider.hasLocationPermission(
+                context
+            )
+        )
+    }
     var backgroundLocationGranted by remember {
         mutableStateOf(context.hasBackgroundLocationPermission())
     }
@@ -129,7 +135,7 @@ fun AutomaticRoute(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { results ->
         val granted = results[Manifest.permission.ACCESS_FINE_LOCATION] == true ||
-            results[Manifest.permission.ACCESS_COARSE_LOCATION] == true
+                results[Manifest.permission.ACCESS_COARSE_LOCATION] == true
         fineLocationGranted = granted
         if (granted && pendingBackgroundRequest) {
             if (context.hasBackgroundLocationPermission()) {
@@ -312,7 +318,7 @@ fun AutomaticScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Automatic Parking") },
+                title = { Text("Automatic") },
                 actions = {
                     AutomaticTrackingHeader(
                         status = trackingStatus,
@@ -340,15 +346,16 @@ fun AutomaticScreen(
                 )
             }
             SettingsGroup(
-                title = "Automatic",
+                title = "Automatic Parking",
                 tiles = listOf(
                     SettingsTile.Toggle(
-                        icon = rememberVectorPainter(Icons.Filled.Power),
-                        title = "Automatic",
+                        icon = rememberVectorPainter(Icons.Filled.LocationOn),
+                        title = "Automatic Parking",
                         summary = when {
                             !fineLocationGranted -> "Location permission not granted."
                             !backgroundLocationGranted ->
                                 "Needs background location. Enable \"$backgroundPermissionLabel\" in Settings."
+
                             else -> "Records your parking spot when your car disconnects."
                         },
                         checked = automaticEnabled,
@@ -380,7 +387,7 @@ fun AutomaticScreen(
                         summary = if (fineLocationGranted) {
                             "Location permission granted."
                         } else {
-                            "Required to record your parking spot when your car disconnects."
+                            "Required for Automatic Parking."
                         },
                         enabled = !fineLocationGranted,
                         onClick = onRequestFineLocation,
@@ -388,11 +395,10 @@ fun AutomaticScreen(
                     SettingsTile.Link(
                         icon = rememberVectorPainter(Icons.Filled.Layers),
                         title = "Grant Background Location",
-                        summary = when {
-                            backgroundLocationGranted && fineLocationGranted ->
-                                "Location and background access granted."
-                            !fineLocationGranted -> "Grants location and background access as needed."
-                            else -> "Required to record parking while the app is in the background."
+                        summary = if (backgroundLocationGranted && fineLocationGranted) {
+                            "Background location granted."
+                        } else {
+                            "Required for Automatic Parking."
                         },
                         enabled = !(backgroundLocationGranted && fineLocationGranted),
                         onClick = onRequestBackgroundLocation,
@@ -410,8 +416,8 @@ fun AutomaticScreen(
             text = {
                 Text(
                     "Automatic records your parking spot when your car disconnects, " +
-                        "even when the app is in the background. Choose \"All the time\" " +
-                        "when prompted for location access."
+                            "even when the app is in the background. Choose \"All the time\" " +
+                            "when prompted for location access."
                 )
             },
             confirmButton = {
@@ -437,8 +443,10 @@ private fun PermissionWarningBanner(
     val warning = when {
         !fineLocationGranted && !backgroundLocationGranted ->
             "Location and background location permissions are missing."
+
         !fineLocationGranted ->
             "Location permission is missing. Automatic parking can't record your spot."
+
         else ->
             "Background location permission is missing. Automatic parking can't record in the background."
     }
@@ -483,8 +491,9 @@ private fun DevicePickerDialog(
             when {
                 pairedDevices.isEmpty() -> Text(
                     "No paired Bluetooth devices found. " +
-                        "Pair a device in Settings, then try again."
+                            "Pair a device in Settings, then try again."
                 )
+
                 else -> Column(
                     modifier = Modifier
                         .verticalScroll(rememberScrollState())
@@ -566,13 +575,16 @@ private fun Context.getPairedDevices(): List<BondedDevice> {
 
 private fun Context.hasBackgroundLocationPermission(): Boolean =
     Build.VERSION.SDK_INT < Build.VERSION_CODES.Q ||
-        ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_BACKGROUND_LOCATION) ==
-        PackageManager.PERMISSION_GRANTED
+            ContextCompat.checkSelfPermission(
+                this,
+                Manifest.permission.ACCESS_BACKGROUND_LOCATION
+            ) ==
+            PackageManager.PERMISSION_GRANTED
 
 private fun Context.hasBluetoothConnectPermission(): Boolean =
     Build.VERSION.SDK_INT < Build.VERSION_CODES.S ||
-        ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) ==
-        PackageManager.PERMISSION_GRANTED
+            ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) ==
+            PackageManager.PERMISSION_GRANTED
 
 private fun Context.shouldShowPermissionRationale(permission: String): Boolean =
     (this as? Activity)?.shouldShowRequestPermissionRationale(permission) ?: false
