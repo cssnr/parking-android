@@ -13,12 +13,12 @@ import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -39,7 +39,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -52,8 +51,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -66,6 +64,8 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import org.cssnr.parking.data.LocationProvider
 import org.cssnr.parking.ui.AutomaticTrackingHeader
 import org.cssnr.parking.ui.AutomaticTrackingStatus
+import org.cssnr.parking.ui.components.SettingsGroup
+import org.cssnr.parking.ui.components.SettingsTile
 import org.cssnr.parking.ui.theme.ParKingTheme
 import org.cssnr.parking.ui.viewmodel.AutomaticViewModel
 
@@ -321,13 +321,13 @@ fun AutomaticScreen(
                 },
             )
         },
+        containerColor = MaterialTheme.colorScheme.surface,
     ) { innerPadding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
                 .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             if (
                 automaticEnabled &&
@@ -336,30 +336,70 @@ fun AutomaticScreen(
                 PermissionWarningBanner(
                     fineLocationGranted = fineLocationGranted,
                     backgroundLocationGranted = backgroundLocationGranted,
+                    modifier = Modifier.padding(horizontal = 16.dp),
                 )
             }
-            DefineAutomaticTile(
-                automaticEnabled = automaticEnabled,
-                fineLocationGranted = fineLocationGranted,
-                backgroundLocationGranted = backgroundLocationGranted,
-                backgroundPermissionLabel = backgroundPermissionLabel,
-                onAutomaticToggle = onAutomaticToggle,
+            SettingsGroup(
+                title = "Automatic",
+                tiles = listOf(
+                    SettingsTile.Toggle(
+                        icon = rememberVectorPainter(Icons.Filled.Power),
+                        title = "Automatic",
+                        summary = when {
+                            !fineLocationGranted -> "Location permission not granted."
+                            !backgroundLocationGranted ->
+                                "Needs background location. Enable \"$backgroundPermissionLabel\" in Settings."
+                            else -> "Records your parking spot when your car disconnects."
+                        },
+                        checked = automaticEnabled,
+                        onCheckedChange = onAutomaticToggle,
+                    ),
+                    SettingsTile.Action(
+                        icon = rememberVectorPainter(Icons.Filled.Bluetooth),
+                        title = "Devices",
+                        summary = when {
+                            !bluetoothConnectGranted -> "Bluetooth access required to list paired devices."
+                            selectedDeviceNames.isEmpty() -> "Choose which Bluetooth devices this works with."
+                            else -> selectedDeviceNames.joinToString(", ")
+                        },
+                        actionLabel = if (bluetoothConnectGranted) "Edit" else "Allow",
+                        onClick = if (bluetoothConnectGranted) {
+                            onEditDevices
+                        } else {
+                            onRequestBluetoothPermission
+                        },
+                    ),
+                ),
             )
-            DefineDevicesTile(
-                bluetoothConnectGranted = bluetoothConnectGranted,
-                selectedDeviceNames = selectedDeviceNames,
-                onRequestBluetoothPermission = onRequestBluetoothPermission,
-                onEditDevices = onEditDevices,
+            SettingsGroup(
+                title = "Permissions",
+                tiles = listOf(
+                    SettingsTile.Link(
+                        icon = rememberVectorPainter(Icons.Filled.ShareLocation),
+                        title = "Grant Location Permissions",
+                        summary = if (fineLocationGranted) {
+                            "Location permission granted."
+                        } else {
+                            "Required to record your parking spot when your car disconnects."
+                        },
+                        enabled = !fineLocationGranted,
+                        onClick = onRequestFineLocation,
+                    ),
+                    SettingsTile.Link(
+                        icon = rememberVectorPainter(Icons.Filled.Layers),
+                        title = "Grant Background Location",
+                        summary = when {
+                            backgroundLocationGranted && fineLocationGranted ->
+                                "Location and background access granted."
+                            !fineLocationGranted -> "Grants location and background access as needed."
+                            else -> "Required to record parking while the app is in the background."
+                        },
+                        enabled = !(backgroundLocationGranted && fineLocationGranted),
+                        onClick = onRequestBackgroundLocation,
+                    ),
+                ),
             )
-            DefineGrantLocationTile(
-                fineLocationGranted = fineLocationGranted,
-                onRequestFineLocation = onRequestFineLocation,
-            )
-            DefineGrantBackgroundLocationTile(
-                fineLocationGranted = fineLocationGranted,
-                backgroundLocationGranted = backgroundLocationGranted,
-                onRequestBackgroundLocation = onRequestBackgroundLocation,
-            )
+            Spacer(modifier = Modifier.height(16.dp))
         }
     }
 
@@ -392,6 +432,7 @@ fun AutomaticScreen(
 private fun PermissionWarningBanner(
     fineLocationGranted: Boolean,
     backgroundLocationGranted: Boolean,
+    modifier: Modifier = Modifier,
 ) {
     val warning = when {
         !fineLocationGranted && !backgroundLocationGranted ->
@@ -402,7 +443,7 @@ private fun PermissionWarningBanner(
             "Background location permission is missing. Automatic parking can't record in the background."
     }
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.errorContainer,
         ),
@@ -424,111 +465,6 @@ private fun PermissionWarningBanner(
             )
         }
     }
-}
-
-@Composable
-private fun DefineAutomaticTile(
-    automaticEnabled: Boolean,
-    fineLocationGranted: Boolean,
-    backgroundLocationGranted: Boolean,
-    backgroundPermissionLabel: String,
-    onAutomaticToggle: (Boolean) -> Unit,
-) {
-    val subtitle = when {
-        !fineLocationGranted -> "Location permission not granted."
-        !backgroundLocationGranted ->
-            "Needs background location. Enable \"$backgroundPermissionLabel\" in Settings."
-        else -> "Records your parking spot when your car disconnects."
-    }
-    AutomaticCard(
-        icon = Icons.Filled.Power,
-        title = "Automatic",
-        subtitle = subtitle,
-        action = {
-            Switch(
-                checked = automaticEnabled,
-                onCheckedChange = onAutomaticToggle,
-            )
-        },
-    )
-}
-
-@Composable
-private fun DefineDevicesTile(
-    bluetoothConnectGranted: Boolean,
-    selectedDeviceNames: List<String>,
-    onRequestBluetoothPermission: () -> Unit,
-    onEditDevices: () -> Unit,
-) {
-    val subtitle = when {
-        !bluetoothConnectGranted -> "Bluetooth access required to list paired devices."
-        selectedDeviceNames.isEmpty() -> "Choose which Bluetooth devices this works with."
-        else -> selectedDeviceNames.joinToString(", ")
-    }
-    AutomaticCard(
-        icon = Icons.Filled.Bluetooth,
-        title = "Devices",
-        subtitle = subtitle,
-        action = {
-            if (bluetoothConnectGranted || Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                TextButton(
-                    onClick = if (bluetoothConnectGranted) {
-                        onEditDevices
-                    } else {
-                        onRequestBluetoothPermission
-                    },
-                ) {
-                    Text(if (bluetoothConnectGranted) "Edit" else "Allow")
-                }
-            }
-        },
-    )
-}
-
-@Composable
-private fun DefineGrantLocationTile(
-    fineLocationGranted: Boolean,
-    onRequestFineLocation: () -> Unit,
-) {
-    val subtitle = if (fineLocationGranted) {
-        "Location permission granted."
-    } else {
-        "Required to record your parking spot when your car disconnects."
-    }
-    AutomaticCard(
-        icon = Icons.Filled.ShareLocation,
-        title = "Grant Location Permissions",
-        subtitle = subtitle,
-        modifier = if (fineLocationGranted) {
-            Modifier.alpha(0.5f)
-        } else {
-            Modifier.clickable { onRequestFineLocation() }
-        },
-    )
-}
-
-@Composable
-private fun DefineGrantBackgroundLocationTile(
-    fineLocationGranted: Boolean,
-    backgroundLocationGranted: Boolean,
-    onRequestBackgroundLocation: () -> Unit,
-) {
-    val subtitle = when {
-        backgroundLocationGranted && fineLocationGranted ->
-            "Location and background access granted."
-        !fineLocationGranted -> "Grants location and background access as needed."
-        else -> "Required to record parking while the app is in the background."
-    }
-    AutomaticCard(
-        icon = Icons.Filled.Layers,
-        title = "Grant Background Location",
-        subtitle = subtitle,
-        modifier = if (backgroundLocationGranted && fineLocationGranted) {
-            Modifier.alpha(0.5f)
-        } else {
-            Modifier.clickable { onRequestBackgroundLocation() }
-        },
-    )
 }
 
 @Composable
@@ -611,49 +547,6 @@ private fun DevicePickerDialog(
             }
         },
     )
-}
-
-@Composable
-private fun AutomaticCard(
-    icon: ImageVector,
-    title: String,
-    subtitle: String,
-    modifier: Modifier = Modifier,
-    action: @Composable () -> Unit = {},
-) {
-    Card(modifier = modifier.fillMaxWidth()) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                modifier = Modifier.size(24.dp),
-                tint = MaterialTheme.colorScheme.primary,
-            )
-            Spacer(modifier = Modifier.width(16.dp))
-            Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .padding(vertical = 4.dp),
-                verticalArrangement = Arrangement.spacedBy(2.dp),
-            ) {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.titleMedium,
-                )
-                Text(
-                    text = subtitle,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            action()
-        }
-    }
 }
 
 private data class BondedDevice(val name: String, val address: String)
