@@ -78,6 +78,7 @@ fun SettingsScreen(
     onAboutClick: () -> Unit = {},
 ) {
     var showCrashReportingDialog by rememberSaveable { mutableStateOf(false) }
+    val appName = stringResource(R.string.app_name)
 
     Scaffold(
         topBar = {
@@ -122,8 +123,12 @@ fun SettingsScreen(
                 tiles = listOf(
                     SettingsTile.Link(
                         icon = rememberVectorPainter(Icons.Filled.Info),
-                        title = stringResource(R.string.about_parking),
-                        summary = stringResource(R.string.about_parking_summary, BuildConfig.VERSION_NAME),
+                        title = stringResource(R.string.about_parking, appName),
+                        summary = stringResource(
+                            R.string.about_parking_summary,
+                            appName,
+                            BuildConfig.VERSION_NAME,
+                        ),
                         onClick = onAboutClick,
                     ),
                 ),
