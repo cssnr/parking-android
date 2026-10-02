@@ -1,21 +1,21 @@
 package org.cssnr.parking.ui.screens
 
 import android.content.Intent
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.BugReport
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.ListItem
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -25,16 +25,20 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import org.cssnr.parking.BuildConfig
 import org.cssnr.parking.R
 import org.cssnr.parking.ui.AutomaticTrackingHeader
 import org.cssnr.parking.ui.AutomaticTrackingStatus
+import org.cssnr.parking.ui.components.SettingsGroup
+import org.cssnr.parking.ui.components.SettingsTile
 import org.cssnr.parking.ui.theme.ParKingTheme
 import org.cssnr.parking.ui.viewmodel.SettingsViewModel
 
@@ -43,6 +47,7 @@ fun SettingsRoute(
     viewModel: SettingsViewModel = viewModel(),
     trackingStatus: AutomaticTrackingStatus? = null,
     onTrackingStatusClick: () -> Unit = {},
+    onNavigateToAbout: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val acraInfoLink = stringResource(R.string.acra_info_link)
@@ -58,6 +63,7 @@ fun SettingsRoute(
         },
         trackingStatus = trackingStatus,
         onTrackingStatusClick = onTrackingStatusClick,
+        onAboutClick = onNavigateToAbout,
     )
 }
 
@@ -69,13 +75,14 @@ fun SettingsScreen(
     onCrashReportingMoreInfo: () -> Unit,
     trackingStatus: AutomaticTrackingStatus? = null,
     onTrackingStatusClick: () -> Unit = {},
+    onAboutClick: () -> Unit = {},
 ) {
     var showCrashReportingDialog by rememberSaveable { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Settings") },
+                title = { Text(stringResource(R.string.settings)) },
                 actions = {
                     AutomaticTrackingHeader(
                         status = trackingStatus,
@@ -84,6 +91,7 @@ fun SettingsScreen(
                 },
             )
         },
+        containerColor = MaterialTheme.colorScheme.surface,
     ) { innerPadding ->
         Column(
             modifier = Modifier
@@ -91,31 +99,48 @@ fun SettingsScreen(
                 .padding(innerPadding)
                 .verticalScroll(rememberScrollState()),
         ) {
-            SettingToggleRow(
-                leadingIcon = Icons.Filled.BugReport,
-                title = "Enable Crash Reporting",
-                subtitle = "Send Crash Reports",
-                checked = crashReporting,
-                onToggle = { newValue ->
-                    if (newValue) {
-                        onCrashReportingChange(true)
-                    } else {
-                        showCrashReportingDialog = true
-                    }
-                },
+            SettingsGroup(
+                title = stringResource(R.string.settings_group_debug),
+                tiles = listOf(
+                    SettingsTile.Toggle(
+                        icon = rememberVectorPainter(Icons.Filled.BugReport),
+                        title = stringResource(R.string.settings_crash_reporting),
+                        summary = stringResource(R.string.settings_crash_reporting_summary),
+                        checked = crashReporting,
+                        onCheckedChange = { newValue ->
+                            if (newValue) {
+                                onCrashReportingChange(true)
+                            } else {
+                                showCrashReportingDialog = true
+                            }
+                        },
+                    ),
+                ),
             )
+            SettingsGroup(
+                title = stringResource(R.string.settings_group_about),
+                tiles = listOf(
+                    SettingsTile.Link(
+                        icon = rememberVectorPainter(Icons.Filled.Info),
+                        title = stringResource(R.string.about_parking),
+                        summary = stringResource(R.string.about_parking_summary, BuildConfig.VERSION_NAME),
+                        onClick = onAboutClick,
+                    ),
+                ),
+            )
+            Spacer(modifier = Modifier.height(16.dp))
         }
     }
 
     if (showCrashReportingDialog) {
         AlertDialog(
             onDismissRequest = { showCrashReportingDialog = false },
-            title = { Text("Please Reconsider") },
+            title = { Text(stringResource(R.string.acra_disable_title)) },
             text = { Text(stringResource(R.string.acra_disable_message)) },
             confirmButton = {
                 Row {
                     TextButton(onClick = onCrashReportingMoreInfo) {
-                        Text("More Info")
+                        Text(stringResource(R.string.acra_disable_more_info))
                     }
                     TextButton(
                         onClick = {
@@ -123,46 +148,17 @@ fun SettingsScreen(
                             onCrashReportingChange(false)
                         }
                     ) {
-                        Text("Disable")
+                        Text(stringResource(R.string.acra_disable_confirm))
                     }
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showCrashReportingDialog = false }) {
-                    Text("Cancel")
+                    Text(stringResource(R.string.acra_disable_cancel))
                 }
             },
         )
     }
-}
-
-@Composable
-private fun SettingToggleRow(
-    leadingIcon: ImageVector,
-    title: String,
-    subtitle: String? = null,
-    checked: Boolean,
-    onToggle: (Boolean) -> Unit,
-) {
-    ListItem(
-        modifier = Modifier.clickable { onToggle(!checked) },
-        leadingContent = {
-            Icon(
-                imageVector = leadingIcon,
-                contentDescription = null,
-            )
-        },
-        headlineContent = { Text(title) },
-        supportingContent = subtitle?.let { subtitle ->
-            { Text(subtitle) }
-        },
-        trailingContent = {
-            Switch(
-                checked = checked,
-                onCheckedChange = null,
-            )
-        },
-    )
 }
 
 @Preview(showBackground = true)
