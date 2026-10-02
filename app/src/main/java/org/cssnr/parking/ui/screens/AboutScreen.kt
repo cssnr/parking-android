@@ -15,9 +15,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Language
-import androidx.compose.material.icons.filled.Source
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -60,6 +58,7 @@ fun AboutScreen(
     val context = LocalContext.current
     val githubUrl = "https://github.com/cssnr/parking-android"
     val websiteUrl = "https://cssnr.com"
+    val discordUrl = "https://discord.gg/wXy6m2X8wY"
     val kofiUrl = "https://ko-fi.com/cssnr"
 
     Scaffold(
@@ -122,7 +121,7 @@ fun AboutScreen(
                 title = stringResource(R.string.settings_group_about),
                 tiles = listOf(
                     SettingsTile.Link(
-                        icon = rememberVectorPainter(Icons.Filled.Source),
+                        icon = painterResource(R.drawable.fa_github_24),
                         title = stringResource(R.string.about_view_source),
                         summary = stringResource(R.string.about_view_source_summary),
                         onClick = {
@@ -142,7 +141,17 @@ fun AboutScreen(
                         },
                     ),
                     SettingsTile.Link(
-                        icon = rememberVectorPainter(Icons.Filled.Favorite),
+                        icon = painterResource(R.drawable.fa_discord_24),
+                        title = stringResource(R.string.about_discord),
+                        summary = stringResource(R.string.about_discord_summary),
+                        onClick = {
+                            context.startActivity(
+                                Intent(Intent.ACTION_VIEW, discordUrl.toUri())
+                            )
+                        },
+                    ),
+                    SettingsTile.Link(
+                        icon = painterResource(R.drawable.fa_ko_fi_24),
                         title = stringResource(R.string.about_support_development),
                         summary = stringResource(R.string.about_support_development_summary),
                         onClick = {
