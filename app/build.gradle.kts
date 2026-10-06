@@ -28,6 +28,12 @@ android {
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
+        // maplibre-native - no 32-bit libs for the x86 ABI - so we excluded x86 here...
+        // https://developer.android.com/ndk/guides/abis
+        ndk {
+            abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64")
+        }
+
         // ACRA - Acrarium backend setup: https://www.acra.ch/docs/Setup
         buildConfigField("String", "ACRA_URI", "\"${secretProperties.getProperty("acra.uri") ?: ""}\"")
         buildConfigField("String", "ACRA_USER", "\"${secretProperties.getProperty("acra.user") ?: ""}\"")
