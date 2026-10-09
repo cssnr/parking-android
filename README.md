@@ -46,7 +46,7 @@ Parking Android application, built with Kotlin, Jetpack Compose and Material 3.
 Automatically detect **where** you parked your car...
 
 > [!WARNING]  
-> Upgrading to `0.0.7` requires re-installing.
+> Upgrading to `0.0.7` requires re-installing.  
 > A new certificated was generated due to an incorrect CN.  
 > Please report any [Issues](https://github.com/cssnr/parking-android/issues) you find.
 
