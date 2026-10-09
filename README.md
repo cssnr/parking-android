@@ -46,8 +46,8 @@ Parking Android application, built with Kotlin, Jetpack Compose and Material 3.
 Automatically detect **where** you parked your car...
 
 > [!WARNING]  
-> This app is currently in **beta** testing.
-> Expect bugs and/or breaking changes along the way...
+> Upgrading to `0.0.7` requires re-installing.
+> A new certificated was generated due to an incorrect CN.  
 > Please report any [Issues](https://github.com/cssnr/parking-android/issues) you find.
 
 ## Install
@@ -87,7 +87,7 @@ should take you to the settings area to allow installation if not already enable
 _The GitHub APK has been registered with Google's [Android developer verification](https://developer.android.com/developer-verification)._
 
 ```
-EB:3C:65:A6:C9:63:4A:27:07:C2:0F:AC:C7:0E:A5:CD:2A:73:93:40:D9:5D:78:3B:21:7A:34:C6:87:AF:01:92
+10:A4:FC:C1:B6:B7:1C:AD:F9:D1:D6:E2:EE:1E:A0:CC:37:2F:25:33:F9:B7:A2:77:2D:DA:DD:08:14:EC:0C:03
 ```
 
 [_How to Verify an APK Signature_](https://developer.android.com/tools/apksigner#usage-verify)
