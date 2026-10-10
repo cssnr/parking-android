@@ -13,6 +13,19 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
 
     private val settingsRepository = SettingsRepository(application)
 
+    val historyDuration: StateFlow<Int> = settingsRepository.historyDuration
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.Eagerly,
+            initialValue = SettingsRepository.DEFAULT_HISTORY_DURATION,
+        )
+
+    fun setHistoryDuration(index: Int) {
+        viewModelScope.launch {
+            settingsRepository.setHistoryDuration(index)
+        }
+    }
+
     val crashReporting: StateFlow<Boolean> = settingsRepository.crashReporting
         .stateIn(
             scope = viewModelScope,
