@@ -1,5 +1,12 @@
 package org.cssnr.parking.ui
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.only
@@ -21,6 +28,7 @@ import androidx.compose.material3.ScaffoldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.navigation.NavDestination.Companion.hasRoute
@@ -70,15 +78,32 @@ fun ParKingApp() {
         }
     }
 
+    // About is a drill-in from Settings. Animate the bar instead of
+    // adding/removing it instantly, otherwise Scaffold's innerPadding
+    // snaps and the outgoing/incoming content jumps.
+    val isAbout = currentDestination?.hasRoute(About::class) == true
+    val showBottomBar = !isAbout
+
     Scaffold(
         contentWindowInsets = ScaffoldDefaults.contentWindowInsets
             .only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom),
         bottomBar = {
-            if (currentDestination?.hasRoute(About::class) != true) {
+            AnimatedVisibility(
+                visible = showBottomBar,
+                enter = slideInVertically(initialOffsetY = { it }) +
+                    expandVertically(expandFrom = Alignment.Bottom) +
+                    fadeIn(),
+                exit = slideOutVertically(targetOffsetY = { it }) +
+                    shrinkVertically(shrinkTowards = Alignment.Bottom) +
+                    fadeOut(),
+            ) {
             NavigationBar {
                 Destination.entries.forEach { destination ->
+                    // Keep Settings highlighted while About is on top so the
+                    // selection does not flicker out during the slide-away.
                     val selected = currentDestination?.hierarchy
-                        ?.any { it.hasRoute(destination.route::class) } == true
+                        ?.any { it.hasRoute(destination.route::class) } == true ||
+                        (isAbout && destination == Destination.SETTINGS)
                     NavigationBarItem(
                         selected = selected,
                         onClick = {
