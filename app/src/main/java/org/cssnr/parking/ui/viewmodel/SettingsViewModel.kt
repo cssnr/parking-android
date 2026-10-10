@@ -38,4 +38,17 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
             settingsRepository.setCrashReporting(enabled)
         }
     }
+
+    val crashDisableCount: StateFlow<Int> = settingsRepository.crashDisableCount
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.Eagerly,
+            initialValue = 0,
+        )
+
+    fun confirmCrashReportingDisable() {
+        viewModelScope.launch {
+            settingsRepository.confirmCrashReportingDisable()
+        }
+    }
 }
