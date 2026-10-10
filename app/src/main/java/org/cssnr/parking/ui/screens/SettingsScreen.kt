@@ -1,6 +1,7 @@
 package org.cssnr.parking.ui.screens
 
 import android.content.Intent
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -30,6 +31,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.platform.LocalContext
@@ -181,9 +183,17 @@ fun SettingsScreen(
             title = { Text(stringResource(R.string.acra_disable_title)) },
             text = { Text(stringResource(R.string.acra_disable_message)) },
             confirmButton = {
-                Row {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.Start,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
                     TextButton(onClick = onCrashReportingMoreInfo) {
                         Text(stringResource(R.string.acra_disable_more_info))
+                    }
+                    Spacer(modifier = Modifier.weight(1f))
+                    TextButton(onClick = { showCrashReportingDialog = false }) {
+                        Text(stringResource(R.string.acra_disable_cancel))
                     }
                     TextButton(
                         onClick = {
@@ -193,11 +203,6 @@ fun SettingsScreen(
                     ) {
                         Text(stringResource(R.string.acra_disable_confirm))
                     }
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showCrashReportingDialog = false }) {
-                    Text(stringResource(R.string.acra_disable_cancel))
                 }
             },
         )
