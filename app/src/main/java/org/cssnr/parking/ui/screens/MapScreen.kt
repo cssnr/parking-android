@@ -9,7 +9,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AddCircle
-import androidx.compose.material.icons.filled.LocationSearching
+import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
@@ -233,7 +233,7 @@ fun MapScreen(
                             },
                         ) {
                             Icon(
-                                imageVector = Icons.Filled.LocationSearching,
+                                imageVector = Icons.Filled.MyLocation,
                                 contentDescription = "Jump to current location",
                             )
                         }

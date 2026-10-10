@@ -1,14 +1,25 @@
 package org.cssnr.parking.ui
 
-import androidx.annotation.DrawableRes
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.AddLocation
 import androidx.compose.material.icons.filled.Map
+import androidx.compose.material.icons.filled.BrowseGallery
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.outlined.AddLocation
+import androidx.compose.material.icons.outlined.Map
+import androidx.compose.material.icons.outlined.BrowseGallery
+import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -17,9 +28,9 @@ import androidx.compose.material3.ScaffoldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.res.painterResource
 import androidx.navigation.NavDestination.Companion.hasRoute
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
@@ -28,7 +39,6 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
-import org.cssnr.parking.R
 import org.cssnr.parking.ui.navigation.Automatic
 import org.cssnr.parking.ui.navigation.About
 import org.cssnr.parking.ui.navigation.History
@@ -45,13 +55,13 @@ import org.cssnr.parking.ui.screens.SettingsRoute
 enum class Destination(
     val route: Any,
     val label: String,
-    val icon: ImageVector?,
-    @DrawableRes val iconRes: Int? = null,
+    val selectedIcon: ImageVector,
+    val unselectedIcon: ImageVector,
 ) {
-    LOCATION(Location, "Location", Icons.Filled.Map),
-    HISTORY(History, "History", Icons.Filled.History),
-    AUTOMATIC(Automatic, "Automatic", null, R.drawable.md_pin_road_24px),
-    SETTINGS(Settings, "Settings", Icons.Filled.Settings),
+    LOCATION(Location, "Location", Icons.Filled.Map, Icons.Outlined.Map),
+    HISTORY(History, "History", Icons.Filled.BrowseGallery, Icons.Outlined.BrowseGallery),
+    AUTOMATIC(Automatic, "Automatic", Icons.Filled.AddLocation, Icons.Outlined.AddLocation),
+    SETTINGS(Settings, "Settings", Icons.Filled.Settings, Icons.Outlined.Settings),
 }
 
 @Composable
@@ -68,15 +78,32 @@ fun ParKingApp() {
         }
     }
 
+    // About is a drill-in from Settings. Animate the bar instead of
+    // adding/removing it instantly, otherwise Scaffold's innerPadding
+    // snaps and the outgoing/incoming content jumps.
+    val isAbout = currentDestination?.hasRoute(About::class) == true
+    val showBottomBar = !isAbout
+
     Scaffold(
         contentWindowInsets = ScaffoldDefaults.contentWindowInsets
             .only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom),
         bottomBar = {
-            if (currentDestination?.hasRoute(About::class) != true) {
+            AnimatedVisibility(
+                visible = showBottomBar,
+                enter = slideInVertically(initialOffsetY = { it }) +
+                    expandVertically(expandFrom = Alignment.Bottom) +
+                    fadeIn(),
+                exit = slideOutVertically(targetOffsetY = { it }) +
+                    shrinkVertically(shrinkTowards = Alignment.Bottom) +
+                    fadeOut(),
+            ) {
             NavigationBar {
                 Destination.entries.forEach { destination ->
+                    // Keep Settings highlighted while About is on top so the
+                    // selection does not flicker out during the slide-away.
                     val selected = currentDestination?.hierarchy
-                        ?.any { it.hasRoute(destination.route::class) } == true
+                        ?.any { it.hasRoute(destination.route::class) } == true ||
+                        (isAbout && destination == Destination.SETTINGS)
                     NavigationBarItem(
                         selected = selected,
                         onClick = {
@@ -88,18 +115,10 @@ fun ParKingApp() {
                             }
                         },
                         icon = {
-                            val imageVector = destination.icon
-                            if (imageVector != null) {
-                                Icon(
-                                    imageVector = imageVector,
-                                    contentDescription = destination.label,
-                                )
-                            } else {
-                                Icon(
-                                    painter = painterResource(destination.iconRes!!),
-                                    contentDescription = destination.label,
-                                )
-                            }
+                            Icon(
+                                imageVector = if (selected) destination.selectedIcon else destination.unselectedIcon,
+                                contentDescription = destination.label,
+                            )
                         },
                         label = { Text(destination.label) },
                     )
