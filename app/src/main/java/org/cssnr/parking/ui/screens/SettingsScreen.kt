@@ -113,21 +113,21 @@ fun SettingsScreen(
                 .verticalScroll(rememberScrollState()),
         ) {
             val historyLabels = listOf(
-                stringResource(R.string.history_duration_1_week),
-                stringResource(R.string.history_duration_2_weeks),
-                stringResource(R.string.history_duration_1_month),
-                stringResource(R.string.history_duration_3_months),
-                stringResource(R.string.history_duration_6_months),
-                stringResource(R.string.history_duration_1_year),
-                stringResource(R.string.history_duration_indefinitely),
+                stringResource(R.string.history_disabled),
+                stringResource(R.string.history_1_week),
+                stringResource(R.string.history_2_weeks),
+                stringResource(R.string.history_1_month),
+                stringResource(R.string.history_3_months),
+                stringResource(R.string.history_6_months),
+                stringResource(R.string.history_1_year),
             )
             SettingsGroup(
                 title = stringResource(R.string.settings_group_application),
                 tiles = listOf(
                     SettingsTile.Custom(
                         icon = rememberVectorPainter(Icons.Filled.History),
-                        title = stringResource(R.string.settings_history_duration),
-                        summary = stringResource(R.string.settings_history_duration_summary),
+                        title = stringResource(R.string.settings_history),
+                        summary = stringResource(R.string.settings_history_summary),
                         content = {
                             HistoryDurationSlider(
                                 value = historyDuration,
@@ -209,7 +209,7 @@ fun SettingsScreen(
 fun SettingsScreenPreview() {
     ParKingTheme {
         SettingsScreen(
-            historyDuration = 3,
+            historyDuration = 4,
             onHistoryDurationChange = {},
             crashReporting = true,
             onCrashReportingChange = {},
@@ -220,7 +220,7 @@ fun SettingsScreenPreview() {
 
 /**
  * Discrete M3 slider with 7 stops:
- * 1 week | 2 weeks | 1 month | 2 months | 6 months | 1 year | Indefinitely.
+ * Disabled | 1 week | 2 weeks | 1 month | 3 months | 6 months | 1 year.
  *
  * 7 stops on 0f..6f means 5 intermediate steps, which draws the notch/tick at
  * each stop. Persists only onValueChangeFinished to avoid DataStore writes

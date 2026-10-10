@@ -10,12 +10,12 @@ import kotlinx.coroutines.flow.map
 class SettingsRepository(private val context: Context) {
 
     val historyDuration: Flow<Int> = context.parkingDataStore.data.map { preferences ->
-        preferences[HISTORY_DURATION] ?: DEFAULT_HISTORY_DURATION
+        preferences[HISTORY] ?: DEFAULT_HISTORY
     }
 
     suspend fun setHistoryDuration(index: Int) {
         context.parkingDataStore.edit { preferences ->
-            preferences[HISTORY_DURATION] = index.coerceIn(0, HISTORY_DURATION_STEPS)
+            preferences[HISTORY] = index.coerceIn(0, HISTORY_STEPS)
         }
     }
 
@@ -30,25 +30,24 @@ class SettingsRepository(private val context: Context) {
     }
 
     companion object {
-        // 0=1 week | 1=2 weeks | 2=1 month | 3=3 months | 4=6 months | 5=1 year | 6=Indefinitely
-        const val HISTORY_DURATION_STEPS = 6
-        const val DEFAULT_HISTORY_DURATION = 3
-        val HISTORY_DURATION = intPreferencesKey("history_duration")
+        // 0=Disabled | 1=1 week | 2=2 weeks | 3=1 month | 4=3 months | 5=6 months | 6=1 year
+        const val HISTORY_STEPS = 6
+        const val DEFAULT_HISTORY = 4
+        val HISTORY = intPreferencesKey("history")
         val CRASH_REPORTING = booleanPreferencesKey("acra.enable")
 
         /**
-         * Retention in millis for a history duration index, or null to keep
-         * everything (Indefinitely). Months are 30-day approximations: history
-         * pruning is housekeeping, not billing, so calendar exactness buys
-         * nothing here.
+         * Retention in millis for a history index, or null to keep everything
+         * (Disabled). Months are 30-day approximations: history pruning is
+         * housekeeping, not billing, so calendar exactness buys nothing here.
          */
-        fun retentionMillis(index: Int): Long? = when (index.coerceIn(0, HISTORY_DURATION_STEPS)) {
-            0 -> 7L * DAY_MILLIS
-            1 -> 14L * DAY_MILLIS
-            2 -> 30L * DAY_MILLIS
-            3 -> 90L * DAY_MILLIS
-            4 -> 180L * DAY_MILLIS
-            5 -> 365L * DAY_MILLIS
+        fun retentionMillis(index: Int): Long? = when (index.coerceIn(0, HISTORY_STEPS)) {
+            1 -> 7L * DAY_MILLIS
+            2 -> 14L * DAY_MILLIS
+            3 -> 30L * DAY_MILLIS
+            4 -> 90L * DAY_MILLIS
+            5 -> 180L * DAY_MILLIS
+            6 -> 365L * DAY_MILLIS
             else -> null
         }
 

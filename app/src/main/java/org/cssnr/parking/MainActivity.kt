@@ -39,7 +39,7 @@ class MainActivity : ComponentActivity() {
      *
      * Fire-and-forget on purpose: pruning is housekeeping nobody waits on, and
      * a failure only leaves stale rows until the next launch, so it is logged
-     * and dropped. Indefinitely (null retention) skips the query entirely.
+     * and dropped. Disabled (null retention) skips the query entirely.
      */
     private fun pruneExpiredHistory() {
         lifecycleScope.launch {

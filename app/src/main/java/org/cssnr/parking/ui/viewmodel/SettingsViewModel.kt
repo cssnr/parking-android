@@ -17,7 +17,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         .stateIn(
             scope = viewModelScope,
             started = SharingStarted.Eagerly,
-            initialValue = SettingsRepository.DEFAULT_HISTORY_DURATION,
+            initialValue = SettingsRepository.DEFAULT_HISTORY,
         )
 
     fun setHistoryDuration(index: Int) {
