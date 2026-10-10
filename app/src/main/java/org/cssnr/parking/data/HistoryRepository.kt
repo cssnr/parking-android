@@ -22,4 +22,11 @@ class HistoryRepository(database: AppDatabase) {
     suspend fun delete(id: Long) {
         historyDao.deleteById(id)
     }
+
+    /**
+     * Deletes every record older than [cutoff] (epoch millis) and returns how
+     * many rows went away. The caller derives [cutoff] from the retention
+     * setting; null retention (Disabled) means don't call this at all.
+     */
+    suspend fun prune(cutoff: Long): Int = historyDao.deleteOlderThan(cutoff)
 }

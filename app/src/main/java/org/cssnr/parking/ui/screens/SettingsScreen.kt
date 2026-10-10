@@ -5,23 +5,29 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.BugReport
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -41,6 +47,7 @@ import org.cssnr.parking.ui.components.SettingsGroup
 import org.cssnr.parking.ui.components.SettingsTile
 import org.cssnr.parking.ui.theme.ParKingTheme
 import org.cssnr.parking.ui.viewmodel.SettingsViewModel
+import kotlin.math.roundToInt
 
 @Composable
 fun SettingsRoute(
@@ -51,9 +58,12 @@ fun SettingsRoute(
 ) {
     val context = LocalContext.current
     val acraInfoLink = stringResource(R.string.acra_info_link)
+    val historyDuration by viewModel.historyDuration.collectAsStateWithLifecycle()
     val crashReporting by viewModel.crashReporting.collectAsStateWithLifecycle()
 
     SettingsScreen(
+        historyDuration = historyDuration,
+        onHistoryDurationChange = viewModel::setHistoryDuration,
         crashReporting = crashReporting,
         onCrashReportingChange = viewModel::setCrashReporting,
         onCrashReportingMoreInfo = {
@@ -70,6 +80,8 @@ fun SettingsRoute(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
+    historyDuration: Int,
+    onHistoryDurationChange: (Int) -> Unit,
     crashReporting: Boolean,
     onCrashReportingChange: (Boolean) -> Unit,
     onCrashReportingMoreInfo: () -> Unit,
@@ -100,6 +112,32 @@ fun SettingsScreen(
                 .padding(innerPadding)
                 .verticalScroll(rememberScrollState()),
         ) {
+            val historyLabels = listOf(
+                stringResource(R.string.history_disabled),
+                stringResource(R.string.history_1_week),
+                stringResource(R.string.history_2_weeks),
+                stringResource(R.string.history_1_month),
+                stringResource(R.string.history_3_months),
+                stringResource(R.string.history_6_months),
+                stringResource(R.string.history_1_year),
+            )
+            SettingsGroup(
+                title = stringResource(R.string.settings_group_application),
+                tiles = listOf(
+                    SettingsTile.Custom(
+                        icon = rememberVectorPainter(Icons.Filled.History),
+                        title = stringResource(R.string.settings_history),
+                        summary = stringResource(R.string.settings_history_summary),
+                        content = {
+                            HistoryDurationSlider(
+                                value = historyDuration,
+                                labels = historyLabels,
+                                onSelect = onHistoryDurationChange,
+                            )
+                        },
+                    ),
+                ),
+            )
             SettingsGroup(
                 title = stringResource(R.string.settings_group_debug),
                 tiles = listOf(
@@ -171,9 +209,50 @@ fun SettingsScreen(
 fun SettingsScreenPreview() {
     ParKingTheme {
         SettingsScreen(
+            historyDuration = 4,
+            onHistoryDurationChange = {},
             crashReporting = true,
             onCrashReportingChange = {},
             onCrashReportingMoreInfo = {},
+        )
+    }
+}
+
+/**
+ * Discrete M3 slider with 7 stops:
+ * Disabled | 1 week | 2 weeks | 1 month | 3 months | 6 months | 1 year.
+ *
+ * 7 stops on 0f..6f means 5 intermediate steps, which draws the notch/tick at
+ * each stop. Persists only onValueChangeFinished to avoid DataStore writes
+ * on every drag frame.
+ */
+@Composable
+private fun HistoryDurationSlider(
+    value: Int,
+    labels: List<String>,
+    onSelect: (Int) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val coerced = value.coerceIn(0, labels.lastIndex)
+    val valueRange = 0f..labels.lastIndex.toFloat()
+    var sliderValue by remember { mutableFloatStateOf(coerced.toFloat()) }
+    LaunchedEffect(coerced) {
+        sliderValue = coerced.toFloat()
+    }
+    Column(modifier = modifier.fillMaxWidth()) {
+        Slider(
+            value = sliderValue,
+            onValueChange = { sliderValue = it },
+            valueRange = valueRange,
+            steps = labels.size - 2,
+            onValueChangeFinished = {
+                onSelect(sliderValue.roundToInt().coerceIn(0, labels.lastIndex))
+            },
+        )
+        Text(
+            text = labels[sliderValue.roundToInt().coerceIn(0, labels.lastIndex)],
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.primary,
         )
     }
 }
