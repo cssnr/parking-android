@@ -29,12 +29,25 @@ class SettingsRepository(private val context: Context) {
         }
     }
 
+    val crashDisableCount: Flow<Int> = context.parkingDataStore.data.map { preferences ->
+        preferences[CRASH_DISABLE_COUNT] ?: 0
+    }
+
+    suspend fun confirmCrashReportingDisable() {
+        context.parkingDataStore.edit { preferences ->
+            preferences[CRASH_REPORTING] = false
+            preferences[CRASH_DISABLE_COUNT] = (preferences[CRASH_DISABLE_COUNT] ?: 0) + 1
+        }
+    }
+
     companion object {
         // 0=Disabled | 1=1 week | 2=2 weeks | 3=1 month | 4=3 months | 5=6 months | 6=1 year
         const val HISTORY_STEPS = 6
         const val DEFAULT_HISTORY = 4
         val HISTORY = intPreferencesKey("history")
         val CRASH_REPORTING = booleanPreferencesKey("acra.enable")
+        val CRASH_DISABLE_COUNT = intPreferencesKey("ui_acra_disable_count")
+        const val MAX_CRASH_DISABLE_PROMPTS = 2
 
         /**
          * Retention in millis for a history index, or null to keep everything

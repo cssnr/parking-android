@@ -43,6 +43,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import org.cssnr.parking.BuildConfig
 import org.cssnr.parking.R
+import org.cssnr.parking.data.SettingsRepository
 import org.cssnr.parking.ui.AutomaticTrackingHeader
 import org.cssnr.parking.ui.AutomaticTrackingStatus
 import org.cssnr.parking.ui.components.SettingsGroup
@@ -62,12 +63,15 @@ fun SettingsRoute(
     val acraInfoLink = stringResource(R.string.acra_info_link)
     val historyDuration by viewModel.historyDuration.collectAsStateWithLifecycle()
     val crashReporting by viewModel.crashReporting.collectAsStateWithLifecycle()
+    val crashDisableCount by viewModel.crashDisableCount.collectAsStateWithLifecycle()
 
     SettingsScreen(
         historyDuration = historyDuration,
         onHistoryDurationChange = viewModel::setHistoryDuration,
         crashReporting = crashReporting,
         onCrashReportingChange = viewModel::setCrashReporting,
+        crashDisableCount = crashDisableCount,
+        onCrashReportingDisable = viewModel::confirmCrashReportingDisable,
         onCrashReportingMoreInfo = {
             context.startActivity(
                 Intent(Intent.ACTION_VIEW, acraInfoLink.toUri())
@@ -86,6 +90,8 @@ fun SettingsScreen(
     onHistoryDurationChange: (Int) -> Unit,
     crashReporting: Boolean,
     onCrashReportingChange: (Boolean) -> Unit,
+    crashDisableCount: Int,
+    onCrashReportingDisable: () -> Unit,
     onCrashReportingMoreInfo: () -> Unit,
     trackingStatus: AutomaticTrackingStatus? = null,
     onTrackingStatusClick: () -> Unit = {},
@@ -151,6 +157,8 @@ fun SettingsScreen(
                         onCheckedChange = { newValue ->
                             if (newValue) {
                                 onCrashReportingChange(true)
+                            } else if (crashDisableCount >= SettingsRepository.MAX_CRASH_DISABLE_PROMPTS) {
+                                onCrashReportingChange(false)
                             } else {
                                 showCrashReportingDialog = true
                             }
@@ -198,7 +206,7 @@ fun SettingsScreen(
                     TextButton(
                         onClick = {
                             showCrashReportingDialog = false
-                            onCrashReportingChange(false)
+                            onCrashReportingDisable()
                         }
                     ) {
                         Text(stringResource(R.string.acra_disable_confirm))
@@ -218,6 +226,8 @@ fun SettingsScreenPreview() {
             onHistoryDurationChange = {},
             crashReporting = true,
             onCrashReportingChange = {},
+            crashDisableCount = 0,
+            onCrashReportingDisable = {},
             onCrashReportingMoreInfo = {},
         )
     }
