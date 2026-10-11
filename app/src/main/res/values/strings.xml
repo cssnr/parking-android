@@ -4,7 +4,7 @@
 
     <string name="settings_group_application">Application</string>
     <string name="settings_history">Prune History</string>
-    <string name="settings_history_summary">How long to keep history.</string>
+    <string name="settings_history_summary">How often to prune history</string>
     <string name="history_disabled">Disabled</string>
     <string name="history_1_week">1 week</string>
     <string name="history_2_weeks">2 weeks</string>
@@ -15,7 +15,7 @@
 
     <string name="settings_group_debug">Debug</string>
     <string name="settings_crash_reporting">Enable Crash Reporting</string>
-    <string name="settings_crash_reporting_summary">Send crash reports.</string>
+    <string name="settings_crash_reporting_summary">Send crash reports</string>
 
     <!-- About -->
     <string name="settings_group_about">About</string>
@@ -49,6 +49,53 @@
     <!-- Foreground service notification -->
     <string name="notification_watching">Finding where you parked…</string>
 
+    <!-- Channel for the failure alert posted when a disconnect was recorded
+         but no position could be attached. Loud, unlike the tracking channel. -->
+    <string name="failure_channel_name">Parking alerts</string>
+    <string name="failure_channel_description">Alerts you when automatic parking could not record a location.</string>
+    <!-- Failure alert when no GPS fix was available -->
+    <string name="notification_failure_title">Could not record parking location</string>
+    <string name="notification_failure_text">Bluetooth disconnected but no location was available. Open ParKing to save it manually.</string>
+
     <!-- Shown instead of an address when the location request came back empty -->
     <string name="location_not_recorded">Location not recorded</string>
+
+    <!-- Automatic Screen -->
+    <string name="automatic_title">Automatic</string>
+    <string name="automatic_warning_both">Location and background location permissions are missing.</string>
+    <string name="automatic_warning_location">Location permission is missing. Automatic parking can\'t record your spot.</string>
+    <string name="automatic_warning_background">Background location permission is missing. Automatic parking can\'t record in the background.</string>
+    <!-- Automatic - Automatic Parking -->
+    <string name="automatic_parking_title">Automatic Parking</string>
+    <string name="automatic_parking_no_location">Location permission not granted.</string>
+    <string name="automatic_parking_needs_background">Needs background location. Enable \"%1$s\" in Settings.</string>
+    <string name="automatic_parking_summary">Records your parking spot when your car disconnects.</string>
+    <string name="automatic_devices_title">Devices</string>
+    <string name="automatic_devices_no_permission">Bluetooth access required to list paired devices.</string>
+    <string name="automatic_devices_empty">Choose which Bluetooth devices this works with.</string>
+    <string name="automatic_devices_edit">Edit</string>
+    <string name="automatic_devices_allow">Allow</string>
+    <string name="automatic_failure_title">Failure Notifications</string>
+    <string name="automatic_failure_summary">Get an alert if location fails.</string>
+    <!-- Automatic - Required Permissions -->
+    <string name="automatic_required_permissions">Required Permissions</string>
+    <string name="automatic_grant_location">Grant Location Permissions</string>
+    <string name="automatic_location_granted">Location permission granted.</string>
+    <string name="automatic_required_summary">Required for Automatic Parking.</string>
+    <string name="automatic_grant_background">Grant Background Location</string>
+    <string name="automatic_background_granted">Background location granted.</string>
+    <string name="automatic_background_allow_all">Allow all the time</string>
+    <!-- Automatic - Optional Permissions -->
+    <string name="automatic_optional_permissions">Optional Permissions</string>
+    <string name="automatic_grant_notifications">Grant Notification Permissions</string>
+    <string name="automatic_notifications_granted">Notifications permission granted.</string>
+    <string name="automatic_notifications_summary">Required for failure notifications.</string>
+    <!-- Automatic - Dialogs -->
+    <string name="automatic_rationale_title">Background Location Access</string>
+    <string name="automatic_rationale_text">Automatic records your parking spot when your car disconnects, even when the app is in the background. Choose \"All the time\" when prompted for location access.</string>
+    <string name="automatic_rationale_grant">Grant Permissions</string>
+    <string name="automatic_picker_title">Select Devices</string>
+    <string name="automatic_picker_empty">No paired Bluetooth devices found. Pair a device in Settings, then try again.</string>
+    <string name="automatic_save">Save</string>
+    <string name="automatic_cancel">Cancel</string>
 </resources>

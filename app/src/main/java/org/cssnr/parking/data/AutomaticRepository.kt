@@ -22,6 +22,10 @@ class AutomaticRepository(private val context: Context) {
         preferences[SELECTED_BLUETOOTH_DEVICES] ?: emptySet()
     }
 
+    val failureNotificationsEnabled: Flow<Boolean> = context.parkingDataStore.data.map { preferences ->
+        preferences[FAILURE_NOTIFICATIONS_ENABLED] ?: false
+    }
+
     suspend fun setAutomaticEnabled(enabled: Boolean) {
         context.parkingDataStore.edit { preferences ->
             preferences[AUTOMATIC_ENABLED] = enabled
@@ -40,10 +44,18 @@ class AutomaticRepository(private val context: Context) {
         }
     }
 
+    suspend fun setFailureNotificationsEnabled(enabled: Boolean) {
+        context.parkingDataStore.edit { preferences ->
+            preferences[FAILURE_NOTIFICATIONS_ENABLED] = enabled
+        }
+    }
+
     private companion object {
         val AUTOMATIC_ENABLED = booleanPreferencesKey("automatic.enabled")
         val BACKGROUND_PERMISSION_REQUESTED =
             booleanPreferencesKey("automatic.backgroundPermissionRequested")
         val SELECTED_BLUETOOTH_DEVICES = stringSetPreferencesKey("automatic.bluetoothDevices")
+        val FAILURE_NOTIFICATIONS_ENABLED =
+            booleanPreferencesKey("automatic.failureNotificationsEnabled")
     }
 }

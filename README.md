@@ -45,10 +45,15 @@ Parking Android application, built with Kotlin, Jetpack Compose and Material 3.
 
 Automatically detect **where** you parked your car...
 
+_So far this app has worked perfectly for me in real-world testing..._
+
+> [!NOTE]  
+> This app is in early release for testing. Expect frequent and possibly breaking changes.  
+> Please report any [Issues](https://github.com/cssnr/todolist-android/issues) you find.
+
 > [!WARNING]  
 > Upgrading from <`0.0.7` requires re-installing the application.  
-> A new certificated was generated due to an incorrect CN.  
-> Please report any [Issues](https://github.com/cssnr/parking-android/issues) you find.
+> A new certificated was generated due to an incorrect CN.
 
 ## Install
 
@@ -104,10 +109,11 @@ _The GitHub APK has been registered with Google's [Android developer verificatio
 - Automatic Parking Detection
 - Supports Multiple Bluetooth Devices
 - Full History with Location Maps
+- Alerts on Location Failure
 
 ### Planned
 
-- Start the Application...
+- Ability to drop pin on map for manual parking (currently uses GPS)
 
 [![Request Feature](https://img.shields.io/badge/request_feature-brightgreen?style=for-the-badge&logo=rocket&logoColor=white)](https://github.com/cssnr/parking-android/issues/new)
 [![Report Issue](https://img.shields.io/badge/report_issue-red?style=for-the-badge&logo=southwestairlines&logoColor=white)](https://github.com/cssnr/parking-android/issues)

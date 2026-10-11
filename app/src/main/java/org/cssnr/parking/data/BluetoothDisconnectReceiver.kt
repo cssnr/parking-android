@@ -79,6 +79,7 @@ class BluetoothDisconnectReceiver : BroadcastReceiver() {
                 // is only about the position, so a refusal costs nothing.
                 if (!ParkingWatchService.start(applicationContext, record.id)) {
                     Log.w(TAG, "record ${record.id} keeps no position, the service was refused")
+                    ParkingNotifier.notifyFailure(applicationContext)
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "could not handle ${intent.action} for $address: ${e.message}", e)

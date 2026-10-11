@@ -36,6 +36,14 @@ class AutomaticViewModel(application: Application) : AndroidViewModel(applicatio
                 initialValue = emptySet(),
             )
 
+    val failureNotificationsEnabled: StateFlow<Boolean> =
+        automaticRepository.failureNotificationsEnabled
+            .stateIn(
+                scope = viewModelScope,
+                started = SharingStarted.Eagerly,
+                initialValue = false,
+            )
+
     fun setAutomaticEnabled(enabled: Boolean) {
         viewModelScope.launch {
             automaticRepository.setAutomaticEnabled(enabled)
@@ -51,6 +59,12 @@ class AutomaticViewModel(application: Application) : AndroidViewModel(applicatio
     fun setSelectedBluetoothDevices(addresses: Set<String>) {
         viewModelScope.launch {
             automaticRepository.setSelectedBluetoothDevices(addresses)
+        }
+    }
+
+    fun setFailureNotificationsEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            automaticRepository.setFailureNotificationsEnabled(enabled)
         }
     }
 }

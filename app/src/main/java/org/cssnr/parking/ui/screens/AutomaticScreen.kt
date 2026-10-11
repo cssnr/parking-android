@@ -30,6 +30,7 @@ import androidx.compose.material.icons.filled.Bluetooth
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.ShareLocation
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
@@ -53,6 +54,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
@@ -61,7 +63,9 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import org.cssnr.parking.R
 import org.cssnr.parking.data.LocationProvider
+import org.cssnr.parking.data.ParkingNotifier
 import org.cssnr.parking.ui.AutomaticTrackingHeader
 import org.cssnr.parking.ui.AutomaticTrackingStatus
 import org.cssnr.parking.ui.components.SettingsGroup
@@ -79,6 +83,7 @@ fun AutomaticRoute(
 
     val automaticEnabled by viewModel.automaticEnabled.collectAsStateWithLifecycle()
     val selectedBluetoothDevices by viewModel.selectedBluetoothDevices.collectAsStateWithLifecycle()
+    val failureNotificationsEnabled by viewModel.failureNotificationsEnabled.collectAsStateWithLifecycle()
 
     var fineLocationGranted by remember {
         mutableStateOf(
@@ -91,17 +96,28 @@ fun AutomaticRoute(
         mutableStateOf(context.hasBackgroundLocationPermission())
     }
     var bluetoothConnectGranted by remember { mutableStateOf(context.hasBluetoothConnectPermission()) }
+    var notificationsGranted by remember {
+        mutableStateOf(ParkingNotifier.hasNotificationPermission(context))
+    }
     var showBackgroundRationaleDialog by remember { mutableStateOf(false) }
     var showDevicePicker by remember { mutableStateOf(false) }
     var pairedDevices by remember { mutableStateOf(emptyList<BondedDevice>()) }
     var pendingBackgroundRequest by remember { mutableStateOf(false) }
     var autoEnablePending by remember { mutableStateOf(false) }
+    var pendingFailureEnable by remember { mutableStateOf(false) }
 
     val openBackgroundLocationSettings = {
         val intent = Intent(
             Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
             Uri.fromParts("package", context.packageName, null),
         )
+        context.startActivity(intent)
+    }
+
+    val openNotificationSettings = {
+        val intent = Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
+            putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+        }
         context.startActivity(intent)
     }
 
@@ -159,6 +175,35 @@ fun AutomaticRoute(
         }
     }
 
+    val notificationPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        notificationsGranted = granted
+        if (!granted &&
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            !context.shouldShowPermissionRationale(Manifest.permission.POST_NOTIFICATIONS)
+        ) {
+            pendingFailureEnable = false
+            openNotificationSettings()
+        } else {
+            notificationsGranted = ParkingNotifier.hasNotificationPermission(context)
+            if (notificationsGranted && pendingFailureEnable) {
+                pendingFailureEnable = false
+                viewModel.setFailureNotificationsEnabled(true)
+            } else if (!notificationsGranted) {
+                pendingFailureEnable = false
+            }
+        }
+    }
+
+    val requestNotificationPermission = {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+        } else {
+            openNotificationSettings()
+        }
+    }
+
     LaunchedEffect(showDevicePicker, bluetoothConnectGranted) {
         if (bluetoothConnectGranted) {
             pairedDevices = context.getPairedDevices()
@@ -177,17 +222,23 @@ fun AutomaticRoute(
                 fineLocationGranted = LocationProvider.hasLocationPermission(context)
                 backgroundLocationGranted = context.hasBackgroundLocationPermission()
                 bluetoothConnectGranted = context.hasBluetoothConnectPermission()
+                notificationsGranted = ParkingNotifier.hasNotificationPermission(context)
+                if (pendingFailureEnable && notificationsGranted) {
+                    pendingFailureEnable = false
+                    viewModel.setFailureNotificationsEnabled(true)
+                }
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
-    val backgroundPermissionLabel = remember(context) {
+    val backgroundFallback = stringResource(R.string.automatic_background_allow_all)
+    val backgroundPermissionLabel = remember(context, backgroundFallback) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             context.packageManager.backgroundPermissionOptionLabel.toString()
         } else {
-            "Allow all the time"
+            backgroundFallback
         }
     }
 
@@ -276,6 +327,26 @@ fun AutomaticRoute(
                 requestBackgroundLocation()
             }
         },
+        notificationsGranted = notificationsGranted,
+        onRequestNotifications = {
+            if (ParkingNotifier.hasNotificationPermission(context)) {
+                notificationsGranted = true
+            } else {
+                requestNotificationPermission()
+            }
+        },
+        failureNotificationsEnabled = failureNotificationsEnabled,
+        onFailureNotificationsToggle = { enabled ->
+            if (!enabled) {
+                pendingFailureEnable = false
+                viewModel.setFailureNotificationsEnabled(false)
+            } else if (ParkingNotifier.hasNotificationPermission(context)) {
+                viewModel.setFailureNotificationsEnabled(true)
+            } else {
+                pendingFailureEnable = true
+                requestNotificationPermission()
+            }
+        },
         trackingStatus = trackingStatus,
         onTrackingStatusClick = onTrackingStatusClick,
     )
@@ -312,13 +383,17 @@ fun AutomaticScreen(
     onEditDevices: () -> Unit,
     onRequestFineLocation: () -> Unit,
     onRequestBackgroundLocation: () -> Unit,
+    notificationsGranted: Boolean,
+    onRequestNotifications: () -> Unit,
+    failureNotificationsEnabled: Boolean,
+    onFailureNotificationsToggle: (Boolean) -> Unit,
     trackingStatus: AutomaticTrackingStatus? = null,
     onTrackingStatusClick: () -> Unit = {},
 ) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Automatic") },
+                title = { Text(stringResource(R.string.automatic_title)) },
                 actions = {
                     AutomaticTrackingHeader(
                         status = trackingStatus,
@@ -346,62 +421,92 @@ fun AutomaticScreen(
                 )
             }
             SettingsGroup(
-                title = "Automatic Parking",
+                title = stringResource(R.string.automatic_parking_title),
                 tiles = listOf(
                     SettingsTile.Toggle(
                         icon = rememberVectorPainter(Icons.Filled.LocationOn),
-                        title = "Automatic Parking",
+                        title = stringResource(R.string.automatic_parking_title),
                         summary = when {
-                            !fineLocationGranted -> "Location permission not granted."
+                            !fineLocationGranted -> stringResource(R.string.automatic_parking_no_location)
                             !backgroundLocationGranted ->
-                                "Needs background location. Enable \"$backgroundPermissionLabel\" in Settings."
+                                stringResource(
+                                    R.string.automatic_parking_needs_background,
+                                    backgroundPermissionLabel,
+                                )
 
-                            else -> "Records your parking spot when your car disconnects."
+                            else -> stringResource(R.string.automatic_parking_summary)
                         },
                         checked = automaticEnabled,
                         onCheckedChange = onAutomaticToggle,
                     ),
                     SettingsTile.Action(
                         icon = rememberVectorPainter(Icons.Filled.Bluetooth),
-                        title = "Devices",
+                        title = stringResource(R.string.automatic_devices_title),
                         summary = when {
-                            !bluetoothConnectGranted -> "Bluetooth access required to list paired devices."
-                            selectedDeviceNames.isEmpty() -> "Choose which Bluetooth devices this works with."
+                            !bluetoothConnectGranted -> stringResource(R.string.automatic_devices_no_permission)
+                            selectedDeviceNames.isEmpty() -> stringResource(R.string.automatic_devices_empty)
                             else -> selectedDeviceNames.joinToString(", ")
                         },
-                        actionLabel = if (bluetoothConnectGranted) "Edit" else "Allow",
+                        actionLabel = if (bluetoothConnectGranted) {
+                            stringResource(R.string.automatic_devices_edit)
+                        } else {
+                            stringResource(R.string.automatic_devices_allow)
+                        },
                         onClick = if (bluetoothConnectGranted) {
                             onEditDevices
                         } else {
                             onRequestBluetoothPermission
                         },
                     ),
+                    SettingsTile.Toggle(
+                        icon = rememberVectorPainter(Icons.Filled.Notifications),
+                        title = stringResource(R.string.automatic_failure_title),
+                        summary = stringResource(R.string.automatic_failure_summary),
+                        checked = failureNotificationsEnabled,
+                        onCheckedChange = onFailureNotificationsToggle,
+                    ),
                 ),
             )
             SettingsGroup(
-                title = "Permissions",
+                title = stringResource(R.string.automatic_required_permissions),
                 tiles = listOf(
                     SettingsTile.Link(
                         icon = rememberVectorPainter(Icons.Filled.ShareLocation),
-                        title = "Grant Location Permissions",
+                        title = stringResource(R.string.automatic_grant_location),
                         summary = if (fineLocationGranted) {
-                            "Location permission granted."
+                            stringResource(R.string.automatic_location_granted)
                         } else {
-                            "Required for Automatic Parking."
+                            stringResource(R.string.automatic_required_summary)
                         },
                         enabled = !fineLocationGranted,
                         onClick = onRequestFineLocation,
                     ),
                     SettingsTile.Link(
                         icon = rememberVectorPainter(Icons.Filled.Layers),
-                        title = "Grant Background Location",
+                        title = stringResource(R.string.automatic_grant_background),
                         summary = if (backgroundLocationGranted && fineLocationGranted) {
-                            "Background location granted."
+                            stringResource(R.string.automatic_background_granted)
                         } else {
-                            "Required for Automatic Parking."
+                            stringResource(R.string.automatic_required_summary)
                         },
                         enabled = !(backgroundLocationGranted && fineLocationGranted),
                         onClick = onRequestBackgroundLocation,
+                    ),
+                ),
+            )
+            SettingsGroup(
+                title = stringResource(R.string.automatic_optional_permissions),
+                tiles = listOf(
+                    SettingsTile.Link(
+                        icon = rememberVectorPainter(Icons.Filled.Notifications),
+                        title = stringResource(R.string.automatic_grant_notifications),
+                        summary = if (notificationsGranted) {
+                            stringResource(R.string.automatic_notifications_granted)
+                        } else {
+                            stringResource(R.string.automatic_notifications_summary)
+                        },
+                        enabled = !notificationsGranted,
+                        onClick = onRequestNotifications,
                     ),
                 ),
             )
@@ -412,22 +517,18 @@ fun AutomaticScreen(
     if (showPermissionRationaleDialog) {
         AlertDialog(
             onDismissRequest = onPermissionRationaleDismiss,
-            title = { Text("Background Location Access") },
+            title = { Text(stringResource(R.string.automatic_rationale_title)) },
             text = {
-                Text(
-                    "Automatic records your parking spot when your car disconnects, " +
-                            "even when the app is in the background. Choose \"All the time\" " +
-                            "when prompted for location access."
-                )
+                Text(stringResource(R.string.automatic_rationale_text))
             },
             confirmButton = {
                 TextButton(onClick = onPermissionRationaleGrant) {
-                    Text("Grant Permissions")
+                    Text(stringResource(R.string.automatic_rationale_grant))
                 }
             },
             dismissButton = {
                 TextButton(onClick = onPermissionRationaleDismiss) {
-                    Text("Cancel")
+                    Text(stringResource(R.string.automatic_cancel))
                 }
             },
         )
@@ -442,13 +543,13 @@ private fun PermissionWarningBanner(
 ) {
     val warning = when {
         !fineLocationGranted && !backgroundLocationGranted ->
-            "Location and background location permissions are missing."
+            stringResource(R.string.automatic_warning_both)
 
         !fineLocationGranted ->
-            "Location permission is missing. Automatic parking can't record your spot."
+            stringResource(R.string.automatic_warning_location)
 
         else ->
-            "Background location permission is missing. Automatic parking can't record in the background."
+            stringResource(R.string.automatic_warning_background)
     }
     Card(
         modifier = modifier.fillMaxWidth(),
@@ -486,13 +587,10 @@ private fun DevicePickerDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Select Devices") },
+        title = { Text(stringResource(R.string.automatic_picker_title)) },
         text = {
             when {
-                pairedDevices.isEmpty() -> Text(
-                    "No paired Bluetooth devices found. " +
-                            "Pair a device in Settings, then try again."
-                )
+                pairedDevices.isEmpty() -> Text(stringResource(R.string.automatic_picker_empty))
 
                 else -> Column(
                     modifier = Modifier
@@ -547,12 +645,12 @@ private fun DevicePickerDialog(
                 onClick = { onSave(selection) },
                 enabled = pairedDevices.isNotEmpty(),
             ) {
-                Text("Save")
+                Text(stringResource(R.string.automatic_save))
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Cancel")
+                Text(stringResource(R.string.automatic_cancel))
             }
         },
     )
@@ -599,7 +697,7 @@ fun AutomaticScreenPreview() {
             backgroundLocationGranted = false,
             bluetoothConnectGranted = false,
             selectedDeviceNames = emptyList(),
-            backgroundPermissionLabel = "Allow all the time",
+            backgroundPermissionLabel = stringResource(R.string.automatic_background_allow_all),
             showPermissionRationaleDialog = true,
             onPermissionRationaleGrant = {},
             onPermissionRationaleDismiss = {},
@@ -608,6 +706,10 @@ fun AutomaticScreenPreview() {
             onEditDevices = {},
             onRequestFineLocation = {},
             onRequestBackgroundLocation = {},
+            notificationsGranted = false,
+            onRequestNotifications = {},
+            failureNotificationsEnabled = false,
+            onFailureNotificationsToggle = {},
         )
     }
 }

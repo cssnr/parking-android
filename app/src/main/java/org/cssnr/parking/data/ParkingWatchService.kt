@@ -60,6 +60,7 @@ class ParkingWatchService : Service() {
             // is never resolved after the fact because a later fix would be the
             // user's current position rather than the car's.
             Log.e(TAG, "could not enter the foreground, record $recordId keeps no position")
+            scope.launch { ParkingNotifier.notifyFailure(this@ParkingWatchService) }
             stopSelf()
             return START_NOT_STICKY
         }
@@ -103,6 +104,7 @@ class ParkingWatchService : Service() {
                         // Not retried anywhere. A fix obtained after the fact would
                         // be where the user is standing now, not where the car is.
                         Log.w(TAG, "no fix, record $recordId keeps no position")
+                        ParkingNotifier.notifyFailure(applicationContext)
                     } else {
                         ParkingRecorder(
                             AutomaticRepository(applicationContext),
@@ -114,6 +116,7 @@ class ParkingWatchService : Service() {
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "failed to place record $recordId: ${e.message}", e)
+                ParkingNotifier.notifyFailure(applicationContext)
             } finally {
                 shutdown()
             }
