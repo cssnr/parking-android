@@ -130,7 +130,7 @@ fun AboutScreen(
                 contentPadding = PaddingValues(horizontal = 24.dp),
             ) {
                 Text(
-                    text = stringResource(R.string.about_version, BuildConfig.VERSION_NAME),
+                    text = stringResource(R.string.about_version, BuildConfig.VERSION_NAME, BuildConfig.VERSION_CODE),
                     style = MaterialTheme.typography.bodyMedium,
                 )
             }
