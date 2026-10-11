@@ -176,6 +176,7 @@ fun SettingsScreen(
                             R.string.about_parking_summary,
                             appName,
                             BuildConfig.VERSION_NAME,
+                            BuildConfig.VERSION_CODE,
                         ),
                         onClick = onAboutClick,
                     ),
